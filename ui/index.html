@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; object-src 'none'">
+<link rel="stylesheet" href="style.css">
+<title>Mithra Desktop</title>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="mark">m</div><div>Mithra <small>DESKTOP ASSISTANT</small></div></div>
+  <button id="settings-open" class="secondary">Settings</button>
+</header>
+<main>
+  <section class="avatar" aria-label="Mithra voice controls">
+    <div class="state"><i></i><span id="state">Ready</span></div>
+    <div class="stage" aria-hidden="true">
+      <div class="orbit"></div>
+      <div class="robot"><div class="visor"><div class="eyes"><b></b><b></b></div><div id="mouth"></div></div></div>
+    </div>
+    <h1 lang="si">ආයුබෝවන්!</h1>
+    <p>Speak with Mithra in Sinhala or English.</p>
+    <button id="voice">Start voice</button>
+    <div class="voice-label">Gemini Live</div>
+  </section>
+  <section class="chat" aria-label="Conversation">
+    <div class="chat-top"><h2>Conversation</h2><span id="provider-pill">OpenAI</span></div>
+    <div id="messages" role="log" aria-live="polite"></div>
+    <div id="activity" role="status"></div>
+    <form id="composer">
+      <label class="check"><input id="automation" type="checkbox"> Enable browser actions</label>
+      <div class="entry"><input id="prompt" type="text" placeholder="Ask Mithra anything…" aria-label="Message" maxlength="12000" required><button id="send" type="submit">Send</button><button id="cancel" type="button" class="secondary" hidden>Stop</button></div>
+    </form>
+  </section>
+</main>
+<dialog id="settings">
+  <form method="dialog">
+    <div class="chat-top"><h2>Settings</h2><button class="secondary">Done</button></div>
+    <p>API keys stay in memory for this app session.</p>
+    <fieldset><legend>Gemini Live voice</legend>
+      <label>API key <input id="voice-key" type="password" autocomplete="off"></label>
+      <label>Live model <input id="voice-model" value="gemini-3.1-flash-live-preview"></label>
+    </fieldset>
+    <fieldset><legend>Text provider</legend>
+      <label>Provider <select id="provider"><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="custom">Custom · OpenAI-compatible</option></select></label>
+      <label id="url-row" hidden>API base URL <input id="text-url" placeholder="https://provider.example/v1"></label>
+      <label>API key <input id="text-key" type="password" autocomplete="off"></label>
+      <label>Model <input id="text-model" value="gpt-4o-mini"></label>
+    </fieldset>
+  </form>
+</dialog>
+<script src="app.js"></script>
+</body>
+</html>
