@@ -204,7 +204,9 @@ get('hermes-test').onclick = async () => {
   status.textContent = 'Checking the local gateway…';
   try {
     const result = await api.inspectHermes({ url: get('text-url').value.trim(), key: get('text-key').value.trim() });
-    status.textContent = `Connected. ${result.skills.length} skills available. Active toolsets: ${result.toolsets.join(', ') || 'unreported'}.`;
+    const skills = result.skills ? `${result.skills.length} skills listed.` : 'Skill catalogue unavailable.';
+    const tools = result.toolsets ? (result.toolsets.join(', ') || 'none') : 'unavailable';
+    status.textContent = `Connected. ${skills} Active toolsets: ${tools}.`;
   } catch (error) {
     status.textContent = error.message.replace(/^Error invoking remote method '[^']+': Error: /, '');
   } finally { button.disabled = false; }

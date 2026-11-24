@@ -40,9 +40,9 @@ function createHermesClient({ url, key, request = fetch }) {
     return {
       connected: true,
       skills: skills.status === 'fulfilled' && Array.isArray(skills.value?.data ?? skills.value)
-        ? (skills.value.data ?? skills.value).map(item => item.name).filter(Boolean) : [],
+        ? (skills.value.data ?? skills.value).map(item => item.name).filter(Boolean) : null,
       toolsets: toolsets.status === 'fulfilled' && Array.isArray(toolsets.value?.data ?? toolsets.value)
-        ? (toolsets.value.data ?? toolsets.value).filter(item => item.enabled).map(item => item.name) : [],
+        ? (toolsets.value.data ?? toolsets.value).filter(item => item.enabled).map(item => item.name) : null,
     };
   }
 

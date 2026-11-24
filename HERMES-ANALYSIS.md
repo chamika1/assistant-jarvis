@@ -25,3 +25,7 @@ Sources include the [upstream feature guide](https://hermes-agent.nousresearch.c
 5. Enable **Keep text task history on this device** to restore task tabs and their session IDs after restarting Mithra. Hermes stores the authoritative transcript under its own session settings.
 
 Mithra connects to loopback endpoints and keeps the key in its encrypted provider settings. Hermes tools execute on the gateway machine according to the selected profile. The desktop installer includes the Mithra interface and API client. Install and update Hermes separately.
+
+## Verification
+
+The bridge completed two turns in one session through the checked-out upstream gateway using a local model fixture. Approval, clarification, and cancellation were exercised separately against API fixtures. The upstream checkout returned an error from its optional skills-list endpoint. Mithra reports an unavailable catalogue in that case while continuing to run agent tasks.
