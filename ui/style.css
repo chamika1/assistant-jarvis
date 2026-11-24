@@ -81,3 +81,6 @@ input:not([type=checkbox]),select{background:#0f1823;border-color:#34445a}
 #settings textarea{background:#0f1823;border:1px solid #34445a;border-radius:9px;color:var(--text);font:inherit;padding:10px;resize:vertical;width:100%}
 #settings fieldset p{font-size:12px;margin:5px 0}
 #settings fieldset .check{display:flex}
+#hermes-control{border:1px solid #42566c;background:#172535;border-radius:9px;padding:9px;margin:8px 0}
+#hermes-prompt{white-space:pre-wrap;max-height:110px;overflow:auto;overflow-wrap:anywhere;margin:0 0 8px}
+#hermes-answer{margin-bottom:8px}

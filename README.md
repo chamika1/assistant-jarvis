@@ -80,3 +80,9 @@ Ask Mithra to save a file from a site that offers a Download or Export control. 
 Browser tasks reopen the same Mithra-managed profile and share its sign-ins. Log in manually in that window once. Your existing everyday Chrome profile stays separate. Ask Mithra to close the current tab or the whole Mithra browser.
 
 For a public YouTube or Facebook video you have permission to download, install a current [yt-dlp](https://github.com/yt-dlp/yt-dlp#installation) on PATH and restart Mithra. Give it the single video URL, ask to download it, and choose a folder. Mithra uses a combined video/audio format and leaves browser cookies separate. Some videos require additional upstream tooling or are unavailable to yt-dlp. Site-provided Download controls remain available.
+
+## Hermes Agent engine
+
+Select **Hermes Agent · local gateway** under **Settings → Text provider** to run tasks with the upstream Hermes engine. Mithra uses its Runs API for persistent sessions, approval, clarification, and stopping runs. The connection test shows active toolsets and a skill count. Gemini Live voice can delegate background tasks to Hermes.
+
+See [Hermes feature analysis and setup](HERMES-ANALYSIS.md).

@@ -7,6 +7,7 @@ files:
   - browser-controls.cjs
   - settings-store.cjs
   - updater.cjs
+  - hermes-client.cjs
   - preload.cjs
   - ui/**
   - package.json

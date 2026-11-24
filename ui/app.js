@@ -3,6 +3,7 @@ const api = window.mithra;
 const tasks = new Map();
 let selectedTask;
 const profiles = {
+  hermes: { key: '', model: '', url: 'http://127.0.0.1:8642/v1' },
   openai: { key: '', model: 'gpt-4o-mini', url: '' },
   deepseek: { key: '', model: 'deepseek-chat', url: '' },
   custom: { key: '', model: '', url: '' },
@@ -102,6 +103,7 @@ function renderTasks() {
   get('send').disabled = task.state === 'running';
   get('cancel').hidden = task.state !== 'running';
   get('activity').textContent = task.detail;
+  renderHermesControl();
 }
 
 get('new-task').onclick = () => { selectTask(makeTask()); get('prompt').focus(); };
@@ -158,6 +160,56 @@ function rememberProfile() {
   };
 }
 
+function renderHermesControl() {
+  const prompt = selectedTask?.hermesPrompt;
+  get('hermes-control').hidden = !prompt;
+  if (!prompt) return;
+  const approval = prompt.kind === 'approval';
+  const explanation = approval ? [prompt.description, prompt.command].filter(Boolean).join('\n') : prompt.question;
+  const options = !approval && Array.isArray(prompt.choices) && prompt.choices.length
+    ? '\n' + prompt.choices.join(' · ') : '';
+  get('hermes-prompt').textContent = String(explanation || 'Hermes needs your input.').slice(0, 3000) + options.slice(0, 800);
+  get('hermes-answer').hidden = approval;
+  get('hermes-allow').textContent = approval ? 'Allow once' : 'Send answer';
+  get('hermes-deny').textContent = approval ? 'Deny' : 'Skip';
+}
+
+function answerHermes(allow) {
+  const task = selectedTask;
+  const prompt = task?.hermesPrompt;
+  if (!prompt) return;
+  const value = prompt.kind === 'approval' ? (allow ? 'once' : 'deny') :
+    (allow ? get('hermes-answer').value.trim() : '');
+  api.answerHermes({ taskId: task.id, promptId: prompt.prompt_id, generation: prompt.execution_generation, value });
+  task.hermesPrompt = null;
+  get('hermes-answer').value = '';
+  renderHermesControl();
+}
+
+api.onHermesControl(({ taskId, prompt }) => {
+  const task = tasks.get(taskId);
+  if (!task) return;
+  task.hermesPrompt = prompt;
+  if (selectedTask === task) {
+    get('hermes-answer').value = '';
+    renderHermesControl();
+  }
+});
+get('hermes-allow').onclick = () => answerHermes(true);
+get('hermes-deny').onclick = () => answerHermes(false);
+get('hermes-test').onclick = async () => {
+  const button = get('hermes-test');
+  const status = get('hermes-status');
+  button.disabled = true;
+  status.textContent = 'Checking the local gateway…';
+  try {
+    const result = await api.inspectHermes({ url: get('text-url').value.trim(), key: get('text-key').value.trim() });
+    status.textContent = `Connected. ${result.skills.length} skills available. Active toolsets: ${result.toolsets.join(', ') || 'unreported'}.`;
+  } catch (error) {
+    status.textContent = error.message.replace(/^Error invoking remote method '[^']+': Error: /, '');
+  } finally { button.disabled = false; }
+};
+
 function showProvider(value) {
   provider = Object.hasOwn(profiles, value) ? value : 'openai';
   get('provider').value = provider;
@@ -165,7 +217,10 @@ function showProvider(value) {
   get('text-key').value = profile.key;
   get('text-model').value = profile.model;
   get('text-url').value = profile.url;
-  get('url-row').hidden = provider !== 'custom';
+  get('url-row').hidden = !['custom', 'hermes'].includes(provider);
+  get('model-row').hidden = provider === 'hermes';
+  get('hermes-settings').hidden = provider !== 'hermes';
+  get('hermes-status').textContent = '';
   get('provider-pill').textContent = get('provider').selectedOptions[0].textContent;
 }
 
@@ -279,14 +334,15 @@ get('composer').onsubmit = async event => {
 async function submitTask(task, content, background = false) {
   await settingsReady;
   if (!content || task === voiceTask || task.state === 'running') return;
-  if (!get('text-key').value.trim() || !get('text-model').value.trim()) {
+  if (!get('text-key').value.trim() || (provider !== 'hermes' && !get('text-model').value.trim())) {
     if (!background && !get('settings').open) get('settings-open').click();
     if (background) { task.state = 'failed'; task.detail = 'Configure the text provider in Settings.'; renderTasks(); }
     return;
   }
+  const engine = provider;
   if (!task.history.length) task.title = content.slice(0, 70);
   task.state = 'running';
-  task.detail = 'Waiting for the model…';
+  task.detail = provider === 'hermes' ? 'Waiting for the Hermes gateway…' : 'Waiting for the model…';
   task.stopping = false;
   if (!background) get('prompt').value = '';
   message('user', content, task);
@@ -300,11 +356,11 @@ async function submitTask(task, content, background = false) {
     }, [...task.history.slice(-28), turn], task.id);
     message('assistant', reply.text, task);
     task.history.push(turn, { role: 'assistant', content: reply.text });
-    task.state = reply.paused ? 'paused' : 'done';
+    task.state = reply.stopped ? 'stopped' : reply.paused ? 'paused' : 'done';
     task.detail = reply.paused ? 'Complete verification in this task’s browser, then type “continue”.' : '';
   } catch (error) {
-    task.state = task.stopping ? 'stopped' : 'failed';
-    message('assistant', task.stopping ? 'Task stopped.' :
+    task.state = task.stopping && engine !== 'hermes' ? 'stopped' : 'failed';
+    message('assistant', task.stopping && engine !== 'hermes' ? 'Task stopped.' :
       error.message.replace(/^Error invoking remote method '[^']+': Error: /, ''), task);
     task.detail = '';
   } finally {
@@ -418,7 +474,7 @@ get('voice').onclick = async () => {
     animate(session);
     await api.startVoice({
       key, model, folder: selectedFolder(), automation: get('automation').checked,
-      memory: memoryContext(), background: Boolean(get('text-key').value.trim() && get('text-model').value.trim()),
+      memory: memoryContext(), background: Boolean(get('text-key').value.trim() && (provider === 'hermes' || get('text-model').value.trim())),
     });
   } catch (error) {
     if (voice !== session) return;

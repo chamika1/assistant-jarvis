@@ -31,6 +31,14 @@
     <div id="task-list" aria-label="Tasks"></div>
     <div class="task-header"><strong id="task-title">Conversation</strong><div class="task-buttons"><button id="reuse-task" type="button" class="secondary">Reuse prompt</button><button id="close-task" type="button" class="secondary">Close task</button></div></div>
     <div id="messages" aria-label="Conversation messages"></div>
+    <div id="hermes-control" hidden>
+      <p id="hermes-prompt"></p>
+      <input id="hermes-answer" aria-label="Reply to Hermes" maxlength="4000" hidden>
+      <div class="task-buttons">
+        <button id="hermes-deny" type="button" class="secondary">Deny</button>
+        <button id="hermes-allow" type="button">Allow once</button>
+      </div>
+    </div>
     <div id="activity" role="status"></div>
     <form id="composer">
       <label class="check"><input id="automation" type="checkbox"> Enable browser actions</label>
@@ -53,10 +61,14 @@
       <label>Live model <input id="voice-model" value="gemini-3.1-flash-live-preview"></label>
     </fieldset>
     <fieldset><legend>Text provider</legend>
-      <label>Provider <select id="provider"><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="custom">Custom · OpenAI-compatible</option></select></label>
+      <label>Provider <select id="provider"><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="hermes">Hermes Agent · local gateway</option><option value="custom">Custom · OpenAI-compatible</option></select></label>
       <label id="url-row" hidden>API base URL <input id="text-url" placeholder="https://provider.example/v1"></label>
       <label>API key <input id="text-key" type="password" autocomplete="off"></label>
-      <label>Model <input id="text-model" value="gpt-4o-mini"></label>
+      <label id="model-row">Model <input id="text-model" value="gpt-4o-mini"></label>
+      <div id="hermes-settings" hidden>
+        <button id="hermes-test" type="button" class="secondary">Test Hermes connection</button>
+        <p id="hermes-status" role="status"></p>
+      </div>
     </fieldset>
     <fieldset><legend>Long-term memory</legend>
       <label class="check"><input id="use-memory" type="checkbox"> Include memory in new AI requests</label>
