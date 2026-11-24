@@ -6,6 +6,20 @@ const profiles = {
   deepseek: { key: '', model: 'deepseek-chat', url: '' },
   custom: { key: '', model: '', url: '' },
 };
+let folder;
+get('choose-folder').onclick = async () => {
+  folder = await api.pickFolder();
+  if (!folder) return;
+  get('choose-folder').textContent = 'Change folder';
+  get('choose-folder').title = folder;
+  get('cli').checked = true;
+  get('activity').textContent = folder;
+};
+
+function selectedFolder() {
+  return get('cli').checked ? folder : undefined;
+}
+
 let provider = 'openai';
 let voice;
 let busy = false;
@@ -58,7 +72,7 @@ get('composer').onsubmit = async event => {
     const turn = { role: 'user', content };
     const reply = await api.chat({
       provider, model: get('text-model').value.trim(), key: get('text-key').value.trim(),
-      url: get('text-url').value.trim(), automation: get('automation').checked,
+      url: get('text-url').value.trim(), folder: selectedFolder(), automation: get('automation').checked,
     }, [...history.slice(-28), turn]);
     message('assistant', reply);
     history.push(turn, { role: 'assistant', content: reply });
@@ -158,7 +172,7 @@ get('voice').onclick = async () => {
     session.waveform = new Float32Array(session.analyser.fftSize);
     session.analyser.connect(session.context.destination);
     animate(session);
-    await api.startVoice({ key, model, automation: get('automation').checked });
+    await api.startVoice({ key, model, folder: selectedFolder(), automation: get('automation').checked });
   } catch (error) {
     if (voice !== session) return;
     stopVoice();

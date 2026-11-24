@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('mithra', {
+  pickFolder: () => ipcRenderer.invoke('project-folder'),
   chat: (settings, history) => ipcRenderer.invoke('chat', settings, history),
   startVoice: settings => ipcRenderer.invoke('live-start', settings),
   stop: () => ipcRenderer.send('stop'),

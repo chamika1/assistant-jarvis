@@ -38,3 +38,9 @@ npm run check
 ```
 
 [Gemini Live API documentation](https://aistudio.google.com/docs/live-api) · [Playwright browser setup](https://playwright.dev/docs/browsers)
+
+## Project commands
+
+Choose a trusted local project folder and enable **Project commands**. In chat or voice, ask Mithra to check Git status, summarize the Git diff, or run the project's `test`, `build`, or `lint` script. Git and Node must be on your PATH. Mithra shows the command and working directory for approval. Selected scripts run with your local account permissions. A bounded excerpt of the command output goes to the active model.
+
+If Mithra detects a common CAPTCHA or human-verification page, complete the challenge in Chromium and ask Mithra to continue. Detection depends on the verification widget and page.
