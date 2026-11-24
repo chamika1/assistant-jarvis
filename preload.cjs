@@ -21,5 +21,6 @@ contextBridge.exposeInMainWorld('mithra', {
   onVoiceToggle: fn => ipcRenderer.on('voice-toggle', () => fn()),
   audio: samples => ipcRenderer.send('pcm', samples),
   onVoice: fn => ipcRenderer.on('voice', (_event, data) => fn(data)),
+  onTaskEvent: fn => ipcRenderer.on('task-event', (_event, data) => fn(data)),
   onActivity: fn => ipcRenderer.on('activity', (_event, data) => fn(data)),
 });

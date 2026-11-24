@@ -84,3 +84,10 @@ input:not([type=checkbox]),select{background:#0f1823;border-color:#34445a}
 #hermes-control{border:1px solid #42566c;background:#172535;border-radius:9px;padding:9px;margin:8px 0}
 #hermes-prompt{white-space:pre-wrap;max-height:110px;overflow:auto;overflow-wrap:anywhere;margin:0 0 8px}
 #hermes-answer{margin-bottom:8px}
+#running-hint{font-size:13px;color:#adb9ca;margin-bottom:8px}
+#running-hint button{padding:4px 8px;font-size:12px}
+#task-events{border:1px solid #34445a;border-radius:9px;padding:7px 10px;margin:5px 0;color:#dbe9f7;font-size:13px}
+#task-events summary{cursor:pointer}
+#task-event-list{max-height:125px;overflow:auto;margin:5px 0 0;padding-left:18px;overflow-wrap:anywhere}
+#task-event-list li{margin:5px 0}
+#task-event-list span{display:block;color:#adb9ca;white-space:pre-wrap}

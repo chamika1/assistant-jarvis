@@ -545,6 +545,7 @@ async function chat(settings, history, taskId) {
           (typeof settings.memory === 'string' ? settings.memory.slice(0, 12000) : ''),
         signal: abort.signal,
         onStatus: detail => event('activity', { taskId, detail }),
+        onActivity: entry => event('task-event', { taskId, entry }),
         onControl: (prompt, signal) => waitForHermesControl(taskId, prompt, signal),
       });
     }

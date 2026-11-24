@@ -31,15 +31,23 @@ function makeTask(id = crypto.randomUUID(), title = 'New task') {
   const log = document.createElement('div');
   log.setAttribute('role', 'log');
   log.setAttribute('aria-live', 'polite');
-  const task = { id, title, log, history: [], state: 'ready', detail: '' };
+  const task = { id, title, log, history: [], state: 'ready', detail: '', draft: '', events: [] };
   tasks.set(id, task);
   return task;
 }
 
 function selectTask(task) {
+  if (selectedTask && selectedTask !== voiceTask) {
+    selectedTask.draft = get('prompt').value;
+    selectedTask.clarification = get('hermes-answer').value;
+  }
   selectedTask = task;
+  get('prompt').value = task.draft;
+  get('hermes-answer').value = task.clarification || '';
   get('messages').replaceChildren(task.log);
   renderTasks();
+  renderTaskEvents();
+  get('task-list').querySelector('[aria-pressed=true]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   scroll();
 }
 
@@ -101,12 +109,19 @@ function renderTasks() {
   get('close-task').hidden = task === voiceTask || task.state === 'running';
   get('composer').hidden = task === voiceTask;
   get('send').disabled = task.state === 'running';
+  get('prompt').disabled = task.state === 'running';
+  get('running-hint').hidden = task.state !== 'running';
   get('cancel').hidden = task.state !== 'running';
   get('activity').textContent = task.detail;
   renderHermesControl();
 }
 
-get('new-task').onclick = () => { selectTask(makeTask()); get('prompt').focus(); };
+function newTask() {
+  selectTask(makeTask());
+  get('prompt').focus();
+}
+get('new-task').onclick = newTask;
+get('parallel-task').onclick = newTask;
 get('voice-task').onclick = () => selectTask(voiceTask);
 get('reuse-task').onclick = () => {
   const prompt = selectedTask.history.find(turn => turn.role === 'user')?.content;
@@ -136,6 +151,33 @@ function message(role, text, task = selectedTask) {
   if (task === selectedTask) scroll();
   return body;
 }
+
+function renderTaskEvents() {
+  const panel = get('task-events');
+  const list = get('task-event-list');
+  panel.hidden = !selectedTask.events.length;
+  list.replaceChildren(...selectedTask.events.map(entry => {
+    const row = document.createElement('li');
+    const label = document.createElement('strong');
+    label.textContent = entry.label;
+    row.append(label);
+    if (entry.detail) {
+      const detail = document.createElement('span');
+      detail.textContent = entry.detail;
+      row.append(detail);
+    }
+    return row;
+  }));
+  list.scrollTop = list.scrollHeight;
+}
+
+api.onTaskEvent(({ taskId, entry }) => {
+  const task = tasks.get(taskId);
+  if (!task) return;
+  task.events.push(entry);
+  if (task.events.length > 50) task.events.shift();
+  if (selectedTask === task) renderTaskEvents();
+});
 
 function scroll() {
   const log = get('messages');
@@ -346,7 +388,10 @@ async function submitTask(task, content, background = false) {
   task.state = 'running';
   task.detail = provider === 'hermes' ? 'Waiting for the Hermes gateway…' : 'Waiting for the model…';
   task.stopping = false;
-  if (!background) get('prompt').value = '';
+  if (!background) {
+    task.draft = '';
+    if (selectedTask === task) get('prompt').value = '';
+  }
   message('user', content, task);
   renderTasks();
   try {
