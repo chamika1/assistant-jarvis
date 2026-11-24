@@ -1,6 +1,6 @@
 const controlSelector = [
   'a[href]', 'button', 'input:not([type=hidden])', 'select', 'textarea',
-  '[role=button]', '[role=link]', '[role=tab]', '[role=checkbox]', '[role=radio]',
+  '[role=button]', '[role=link]', '[role=tab]', '[role=checkbox]', '[role=radio]', '[role=menuitem]',
   '[tabindex="0"]', '[onclick]', '[data-id]', '[data-channel-id]', 'video',
 ].join(',');
 
@@ -20,10 +20,14 @@ function describeControl(element) {
   const mediaTile = role === 'tile' && [...element.querySelectorAll('span, button')].some(child => child.innerText?.trim().toLowerCase() === 'play');
   const form = element.closest('form');
   const submit = Boolean(form && (element.type === 'submit' || element.type === 'image' || element.hasAttribute('formaction')));
+  const searchButton = submit && form.method === 'get' && new URL(form.action, location.href).origin === location.origin &&
+    element.type !== 'image' && !element.hasAttribute('formaction') &&
+    Boolean(form.querySelector('input[type=search], input[name=q], input[name=search_query]'));
   const mediaControl = /(?:^|\s)(?:play|pause|resume|mute|unmute|fullscreen|volume)(?:\s|$)/i.test(name) &&
     Boolean(element.closest('[class*=player], [id*=player], [class*=video], [id*=video]'));
   return {
-    role, tag, name, placeholder, mediaTile, mediaControl, submit,
+    role, tag, name, placeholder, mediaTile, mediaControl, submit, searchButton,
+    actionHint: normalize([element.title, element.name, element.id, element.getAttribute('data-action')].filter(Boolean).join(' ')),
     type: element.getAttribute('type') || '', href: tag === 'a' ? element.href : '',
     download: element.hasAttribute('download'),
     search, searchSubmission: !form || (form.method === 'get' && new URL(form.action, location.href).origin === location.origin),
@@ -34,15 +38,20 @@ function describeControl(element) {
 }
 
 function allowsRoutineClick(control, frameUrl) {
-  const significant = /\b(?:accept|agree|allow|authorize|buy|checkout|confirm|delete|download|grant|install|login|log in|logout|log out|order|pay|publish|purchase|register|remove|send|share|sign in|sign out|sign up|subscribe|submit|upload)\b/i;
-  if (control.submit || control.download || control.sensitive || significant.test(control.name)) return false;
+  const significant = /\b(?:accept|agree|allow|apply for|authorize|buy|checkout|confirm|consent|delete|disable|download|erase|export|grant|install|join|login|log in|logout|log out|order|pay|post|publish|purchase|register|remove|reset password|revoke|save|send|share|sign in|sign out|sign up|subscribe|submit|transfer|unsubscribe|upload)\b/i;
+  const significantSinhala = /මකන්න|ගෙවන්න|මිලදී|යවන්න|තහවුරු කරන්න|අවසර දෙන්න|එකඟ වෙන්න|ගිණුමක් සාදන්න/u;
+  const action = (control.name + ' ' + (control.actionHint || '')).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]/g, ' ');
+  if (control.submit && !control.searchButton || control.download || control.sensitive ||
+      significant.test(action) || significantSinhala.test(action)) return false;
   if (control.role === 'link' && control.href) {
     const url = new URL(control.href);
+    let route = url.pathname + ' ' + [...url.searchParams.keys()].join(' ');
+    try { route = decodeURIComponent(route); } catch { /* Use the encoded route. */ }
     return url.protocol === 'https:' && !url.username && !url.password &&
-      url.origin === new URL(frameUrl).origin && !significant.test(decodeURIComponent(url.pathname + ' ' + url.search).replace(/[_-]/g, ' '));
+      url.origin === new URL(frameUrl).origin && !significant.test(route.replace(/[_-]/g, ' '));
   }
-  return control.role === 'video' || control.mediaTile || control.mediaControl || control.role === 'tab' ||
-    /^(?:[^\p{L}\p{N}]*\s*)?(?:live tv|explore movies|next page|previous page|play|pause)(?:\s*[^\p{L}\p{N}]*)$/iu.test(control.name);
+  if (control.searchButton || control.mediaTile || control.mediaControl) return true;
+  return ['video', 'tab', 'button', 'checkbox', 'radio', 'combobox', 'menuitem'].includes(control.role);
 }
 
 const describeAll = new Function('elements', `return elements.slice(0, 450).map(${describeControl.toString()})`);
