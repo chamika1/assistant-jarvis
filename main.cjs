@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, globalShortcut, ipcMain } = require('electron');
 const path = require('node:path');
 const { readFile } = require('node:fs/promises');
 const { execFile } = require('node:child_process');
@@ -37,7 +37,7 @@ function enabledTools(settings) {
   return [...(settings.automation ? browserTools : []), ...(settings.folder ? [cliTool] : [])];
 }
 
-async function projectCommand(task, folder, signal) {
+async function projectCommand(task, folder, signal, taskId) {
   const command = commands.get(task);
   if (!folder || folder !== projectFolder || !command) throw new Error('Choose a project folder and a supported command.');
   const [file, args] = command;
@@ -53,7 +53,7 @@ async function projectCommand(task, folder, signal) {
   });
   signal.throwIfAborted();
   if (result.response !== 1 || folder !== projectFolder) return { cancelled: true };
-  event('activity', display);
+  event('activity', { taskId, detail: display });
   return new Promise(resolve => {
     execFile(file, args, {
       cwd: folder, signal, shell: false, timeout: 120000, maxBuffer: 256 * 1024,
@@ -88,11 +88,10 @@ async function checkVerification(tab) {
 
 let window;
 let projectFolder;
-let browser;
-let context;
-let page;
+let browserPromise;
+const browserSessions = new Map();
+const chats = new Map();
 let live;
-let chatAbort;
 let liveActions = Promise.resolve();
 
 function event(name, value) {
@@ -105,28 +104,69 @@ function httpsUrl(value) {
   return url;
 }
 
-async function browserAction(name, args, signal) {
-  signal.throwIfAborted();
-  event('activity', name.replace('_', ' '));
-  if (name === 'browser_open') {
-    if (page && !page.isClosed() && await checkVerification(page)) return verificationRequired();
-    const url = httpsUrl(args.url);
-    if (!browser?.isConnected()) {
-      browser = await chromium.launch({ headless: false, chromiumSandbox: true });
-      context = await browser.newContext({ acceptDownloads: false });
-      context.on('page', tab => { page = tab; });
-      page = await context.newPage();
+async function launchBrowser() {
+  const options = { headless: false, chromiumSandbox: true };
+  try {
+    return await chromium.launch(options);
+  } catch (original) {
+    for (const channel of ['chrome', 'msedge']) {
+      try { return await chromium.launch({ ...options, channel }); }
+      catch { /* Try the next installed browser. */ }
     }
+    throw new Error('Install Google Chrome, Microsoft Edge, or Playwright Chromium to use browser actions.', { cause: original });
+  }
+}
+
+async function createBrowserSession(taskId) {
+  if (browserSessions.size >= 12) throw new Error('Close an existing workflow tab before opening another.');
+  if (!browserPromise) {
+    browserPromise = launchBrowser().then(browser => {
+      browser.once('disconnected', () => {
+        browserPromise = undefined;
+        browserSessions.clear();
+      });
+      return browser;
+    }).catch(error => {
+      browserPromise = undefined;
+      throw error;
+    });
+  }
+  const browser = await browserPromise;
+  const context = await browser.newContext({ acceptDownloads: false });
+  const session = { context };
+  browserSessions.set(taskId, session);
+  context.on('page', tab => {
+    session.page = tab;
+    tab.on('close', () => {
+      if (context.pages().length) {
+        if (session.page === tab) session.page = context.pages().at(-1);
+      } else {
+        if (browserSessions.get(taskId) === session) browserSessions.delete(taskId);
+        context.close().catch(() => {});
+      }
+    });
+  });
+  session.page = await context.newPage();
+  return session;
+}
+
+async function browserAction(name, args, signal, taskId) {
+  signal.throwIfAborted();
+  event('activity', { taskId, detail: name.replace('_', ' ') });
+  let page = browserSessions.get(taskId)?.page;
+  if (name === 'browser_open') {
+    if (page && !page.isClosed() && await checkVerification(page)) return verificationRequired(taskId);
+    const url = httpsUrl(args.url);
+    if (!page || page.isClosed()) page = (await createBrowserSession(taskId)).page;
     signal.throwIfAborted();
-    if (page.isClosed()) page = await context.newPage();
     await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: 20000 });
-    if (await checkVerification(page)) return verificationRequired();
+    if (await checkVerification(page)) return verificationRequired(taskId);
     return { url: page.url() };
   }
   const tab = page;
   if (!tab || tab.isClosed()) throw new Error('Open a browser page first.');
   httpsUrl(tab.url());
-  if (await checkVerification(tab)) return verificationRequired();
+  if (await checkVerification(tab)) return verificationRequired(taskId);
   if (name === 'browser_read') {
     // Remove text input values, textarea contents and editable text from the accessibility output.
     const outline = await tab.locator('body').ariaSnapshot({ timeout: 5000 });
@@ -163,18 +203,18 @@ async function browserAction(name, args, signal) {
   throw new Error('Unknown browser action.');
 }
 
-function verificationRequired() {
+function verificationRequired(taskId) {
   const message = 'Complete the verification in Chromium, then ask Mithra to continue.';
-  event('activity', message);
+  event('activity', { taskId, detail: message });
   return { verificationRequired: true, message };
 }
 
-async function runTool(name, args, signal, settings) {
+async function runTool(name, args, signal, settings, taskId) {
   try {
     signal.throwIfAborted();
-    if (name === cliTool.name) return await projectCommand(args.task, settings.folder, signal);
+    if (name === cliTool.name) return await projectCommand(args.task, settings.folder, signal, taskId);
     if (!settings.automation) throw new Error('Browser actions are disabled.');
-    return await browserAction(name, args, signal);
+    return await browserAction(name, args, signal, taskId);
   } catch (error) {
     return { error: error.message };
   }
@@ -185,13 +225,24 @@ function stopLive() {
   live = undefined;
   if (session) {
     session.abort.abort();
+    clearTimeout(session.retry);
     session.socket.close();
   }
 }
 
-async function startLive(settings) {
+async function startLive(settings, resumeHandle, reconnects = 0) {
   stopLive();
-  const tools = enabledTools(settings);
+  const tools = [...enabledTools(settings), {
+    name: 'active_tasks',
+    description: 'List text tasks currently running in the Mithra task dashboard.',
+    parameters: { type: 'object', properties: {} },
+  }, ...(settings.background ? [{
+    name: 'delegate_text_task',
+    description: 'Only when the user asks for background work, delegate an independent text-analysis task to their configured text model. It cannot use browser or project tools.',
+    parameters: {
+      type: 'object', properties: { request: { type: 'string' } }, required: ['request'],
+    },
+  }] : [])];
   if (!settings.key || !settings.model) throw new Error('Enter a Gemini API key and a Live model in Settings.');
   if (!/^(models\/)?[a-zA-Z0-9._-]+$/.test(settings.model)) throw new Error('Invalid Live model ID.');
   const url = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent';
@@ -204,6 +255,8 @@ async function startLive(settings) {
       generationConfig: { responseModalities: ['AUDIO'] },
       systemInstruction: { parts: [{ text: instructions }] },
       inputAudioTranscription: {}, outputAudioTranscription: {},
+      contextWindowCompression: { slidingWindow: {} },
+      sessionResumption: resumeHandle ? { handle: resumeHandle } : {},
       ...(tools.length ? { tools: [{ functionDeclarations: tools }] } : {}),
     } }));
   });
@@ -214,23 +267,45 @@ async function startLive(settings) {
     if (live !== session) return;
     if (payload.setupComplete) {
       session.ready = true;
-      event('voice', { state: 'Listening' });
+      event('voice', { state: 'Listening', notice: '' });
+    }
+    if (payload.sessionResumptionUpdate) {
+      const update = payload.sessionResumptionUpdate;
+      session.resumeHandle = update.resumable && update.newHandle ? update.newHandle : undefined;
     }
     if (payload.goAway) event('voice', { notice: 'Gemini Live session is about to expire.' });
     if (payload.serverContent) event('voice', { content: payload.serverContent });
     const calls = payload.toolCall?.functionCalls;
     if (tools.length && calls?.length) {
+      session.pendingTools = (session.pendingTools || 0) + 1;
       liveActions = liveActions.then(async () => {
         const functionResponses = [];
         for (const call of calls) {
           if (session.abort.signal.aborted) return;
-          const response = await runTool(call.name, call.args || {}, session.abort.signal, settings);
+          let response;
+          if (call.name === 'active_tasks') {
+            response = { tasks: [...chats.values()].map(task => task.title) };
+          } else if (settings.background && call.name === 'delegate_text_task') {
+            const request = call.args?.request;
+            if (typeof request !== 'string' || !request.trim() || request.length > 12000) {
+              response = { error: 'A task description is required.' };
+            } else if (chats.size >= 4) {
+              response = { error: 'Four tasks are already running.' };
+            } else {
+              event('delegate-task', request);
+              response = { requested: true, message: 'The task was sent to the workspace. Check active tasks for progress.' };
+            }
+          } else {
+            response = await runTool(call.name, call.args || {}, session.abort.signal, settings, 'voice');
+          }
           functionResponses.push({ id: call.id, name: call.name, response });
         }
         if (live === session && socket.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify({ toolResponse: { functionResponses } }));
         }
-      }).catch(() => event('voice', { notice: 'Browser action failed.' }));
+      }).catch(() => {
+        if (live === session) event('voice', { notice: 'Voice action failed.' });
+      }).finally(() => { session.pendingTools--; });
     }
   });
   socket.addEventListener('error', () => {
@@ -239,19 +314,32 @@ async function startLive(settings) {
   socket.addEventListener('close', ({ code, reason }) => {
     if (live !== session) return;
     session.abort.abort();
+    session.ready = false;
+    if ([1000, 1001, 1006, 1011, 1012, 1013].includes(code) && session.resumeHandle && !session.pendingTools && reconnects < 3) {
+      event('voice', { state: 'Reconnecting', notice: 'Restoring the Gemini Live connection…' });
+      session.retry = setTimeout(() => {
+        if (live !== session) return;
+        startLive(settings, session.resumeHandle, reconnects + 1).catch(() => {
+          event('voice', { state: 'Offline', notice: 'Could not restore Gemini Live.' });
+        });
+      }, 750 * (reconnects + 1));
+      return;
+    }
     live = undefined;
     event('voice', { state: 'Offline', notice: `Voice disconnected (${code}) ${reason}`.trim() });
   });
 }
 
-async function chat(settings, history) {
-  if (chatAbort) throw new Error('A reply is already running.');
+async function chat(settings, history, taskId) {
+  if (typeof taskId !== 'string' || taskId.length > 64) throw new Error('Invalid task.');
+  if (chats.has(taskId)) throw new Error('This task is already running.');
+  if (chats.size >= 4) throw new Error('Four tasks are already running.');
   if (!settings.key || !settings.model) throw new Error('Choose a text provider and enter its API key and model in Settings.');
   const base = httpsUrl(presets[settings.provider] || settings.url);
   if (base.search || base.hash) throw new Error('The API base URL must omit query strings and fragments.');
   const tools = enabledTools(settings);
   const abort = new AbortController();
-  chatAbort = abort;
+  chats.set(taskId, { abort, title: String(history.at(-1)?.content || '').slice(0, 120) });
   try {
     const messages = [{ role: 'system', content: instructions }, ...history.slice(-30)];
     for (let step = 0; step < 18; step++) {
@@ -268,20 +356,20 @@ async function chat(settings, history) {
       if (!response.ok) throw new Error(`Provider returned HTTP ${response.status}.`);
       const message = (await response.json()).choices?.[0]?.message;
       if (!message) throw new Error('The provider returned no reply.');
-      if (!message.tool_calls?.length) return message.content || 'The provider returned an empty reply.';
+      if (!message.tool_calls?.length) return { text: message.content || 'The provider returned an empty reply.' };
       if (!tools.length) throw new Error('No tools are enabled.');
       messages.push(message);
       for (const call of message.tool_calls) {
         let args;
         try { args = JSON.parse(call.function.arguments); }
         catch { args = {}; }
-        const result = await runTool(call.function.name, args, abort.signal, settings);
-        if (result.verificationRequired) return result.message;
+        const result = await runTool(call.function.name, args, abort.signal, settings, taskId);
+        if (result.verificationRequired) return { text: result.message, paused: true };
         messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result) });
       }
     }
     throw new Error('This task reached the 18-step limit. Inspect the browser before continuing.');
-  } finally { chatAbort = undefined; }
+  } finally { chats.delete(taskId); }
 }
 
 app.whenReady().then(() => {
@@ -304,22 +392,26 @@ app.whenReady().then(() => {
   });
   ipcMain.handle('chat', (sender, ...args) => trusted(sender) ? chat(...args) : undefined);
   ipcMain.handle('live-start', (sender, settings) => trusted(sender) ? startLive(settings) : undefined);
-  ipcMain.on('stop', sender => {
-    if (!trusted(sender)) return;
-    stopLive();
-    chatAbort?.abort();
+  ipcMain.on('stop-voice', sender => { if (trusted(sender)) stopLive(); });
+  ipcMain.on('stop-task', (sender, taskId) => { if (trusted(sender)) chats.get(taskId)?.abort.abort(); });
+  ipcMain.on('close-task', (sender, taskId) => {
+    if (!trusted(sender) || chats.has(taskId) || taskId === 'voice') return;
+    browserSessions.get(taskId)?.context.close().catch(() => {});
+    browserSessions.delete(taskId);
   });
+  globalShortcut.register('CommandOrControl+Shift+Space', () => event('voice-toggle', true));
   ipcMain.on('pcm', (sender, samples) => {
     if (!trusted(sender) || !live?.ready || live.socket.readyState !== WebSocket.OPEN || live.socket.bufferedAmount > 128000) return;
     live.socket.send(JSON.stringify({ realtimeInput: { audio: {
       data: Buffer.from(samples).toString('base64'), mimeType: 'audio/pcm;rate=16000',
     } } }));
   });
-  window.loadFile('ui/index.html');
+  window.loadFile(path.join(__dirname, 'ui', 'index.html'));
 });
 
 app.on('window-all-closed', () => {
   stopLive();
-  chatAbort?.abort();
-  Promise.resolve(browser?.close()).finally(() => app.quit());
+  globalShortcut.unregisterAll();
+  for (const task of chats.values()) task.abort.abort();
+  Promise.resolve(browserPromise).then(browser => browser?.close()).catch(() => {}).finally(() => app.quit());
 });

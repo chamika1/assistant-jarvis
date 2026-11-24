@@ -1,0 +1,16 @@
+appId: com.mithra.desktop
+productName: Mithra Desktop
+directories:
+  output: dist
+files:
+  - main.cjs
+  - preload.cjs
+  - ui/**
+  - package.json
+asar: true
+win:
+  signAndEditExecutable: false
+  artifactName: mithra-desktop-${version}-windows-${arch}.${ext}
+linux:
+  category: Utility
+  artifactName: mithra-desktop-${version}-linux-${arch}.${ext}

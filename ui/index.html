@@ -22,11 +22,14 @@
     <h1 lang="si">ආයුබෝවන්!</h1>
     <p>Speak with Mithra in Sinhala or English.</p>
     <button id="voice">Start voice</button>
-    <div class="voice-label">Gemini Live</div>
+    <div class="voice-label">Gemini Live <span id="voice-shortcut"></span></div>
   </section>
   <section class="chat" aria-label="Conversation">
-    <div class="chat-top"><h2>Conversation</h2><span id="provider-pill">OpenAI</span></div>
-    <div id="messages" role="log" aria-live="polite"></div>
+    <div class="chat-top"><h2>Workspace</h2><span id="provider-pill">OpenAI</span></div>
+    <div class="task-toolbar"><button id="new-task" class="secondary" type="button">+ New task</button><button id="voice-task" class="secondary" type="button">Voice transcript</button></div>
+    <div id="task-list" aria-label="Tasks"></div>
+    <div class="task-header"><strong id="task-title">Conversation</strong><div class="task-buttons"><button id="reuse-task" type="button" class="secondary">Reuse prompt</button><button id="close-task" type="button" class="secondary">Close task</button></div></div>
+    <div id="messages" aria-label="Conversation messages"></div>
     <div id="activity" role="status"></div>
     <form id="composer">
       <label class="check"><input id="automation" type="checkbox"> Enable browser actions</label>
@@ -39,6 +42,7 @@
   <form method="dialog">
     <div class="chat-top"><h2>Settings</h2><button class="secondary">Done</button></div>
     <p>API keys stay in memory for this app session.</p>
+    <label class="check"><input id="save-history" type="checkbox"> Keep text task history on this device</label>
     <fieldset><legend>Gemini Live voice</legend>
       <label>API key <input id="voice-key" type="password" autocomplete="off"></label>
       <label>Live model <input id="voice-model" value="gemini-3.1-flash-live-preview"></label>

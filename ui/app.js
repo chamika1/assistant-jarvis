@@ -1,6 +1,7 @@
 const get = id => document.getElementById(id);
 const api = window.mithra;
-const history = [];
+const tasks = new Map();
+let selectedTask;
 const profiles = {
   openai: { key: '', model: 'gpt-4o-mini', url: '' },
   deepseek: { key: '', model: 'deepseek-chat', url: '' },
@@ -22,9 +23,106 @@ function selectedFolder() {
 
 let provider = 'openai';
 let voice;
-let busy = false;
+const voiceTask = makeTask('voice', 'Voice transcript');
+const stateLabel = { ready: 'Ready', running: 'Running', done: 'Done', failed: 'Failed', stopped: 'Stopped', paused: 'Needs you' };
 
-function message(role, text) {
+function makeTask(id = crypto.randomUUID(), title = 'New task') {
+  const log = document.createElement('div');
+  log.setAttribute('role', 'log');
+  log.setAttribute('aria-live', 'polite');
+  const task = { id, title, log, history: [], state: 'ready', detail: '' };
+  tasks.set(id, task);
+  return task;
+}
+
+function selectTask(task) {
+  selectedTask = task;
+  get('messages').replaceChildren(task.log);
+  renderTasks();
+  scroll();
+}
+
+const historyKey = 'mithra.textTasks';
+get('save-history').checked = localStorage.getItem(historyKey) !== null;
+get('save-history').onchange = saveHistory;
+
+function saveHistory() {
+  try {
+    if (!get('save-history').checked) {
+      localStorage.removeItem(historyKey);
+      return;
+    }
+    const entries = [...tasks.values()].filter(task => task !== voiceTask && task.history.length).slice(-20)
+      .map(({ id, title, history }) => ({ id, title, history: history.slice(-24) }));
+    localStorage.setItem(historyKey, JSON.stringify(entries));
+  } catch {
+    if (selectedTask) selectedTask.detail = 'Could not save task history on this device.';
+  }
+}
+
+function restoreHistory() {
+  try {
+    const entries = JSON.parse(localStorage.getItem(historyKey) || '[]');
+    for (const { id, title, history } of entries) {
+      const task = makeTask(id, title);
+      task.history = history;
+      task.state = 'done';
+      for (const turn of history) message(turn.role, turn.content, task);
+    }
+  } catch {
+    return;
+  }
+}
+
+function renderTasks() {
+  const list = get('task-list');
+  list.replaceChildren();
+  for (const task of tasks.values()) {
+    if (task === voiceTask) continue;
+    const tab = document.createElement('button');
+    tab.type = 'button';
+    tab.className = 'task-tab';
+    tab.setAttribute('aria-pressed', String(task === selectedTask));
+    tab.title = task.title;
+    const name = document.createElement('span');
+    name.textContent = task.title;
+    const state = document.createElement('small');
+    state.dataset.state = task.state;
+    state.textContent = stateLabel[task.state];
+    tab.append(name, state);
+    tab.onclick = () => selectTask(task);
+    list.append(tab);
+  }
+  const task = selectedTask;
+  get('task-title').textContent = task.title;
+  get('voice-task').setAttribute('aria-pressed', String(task === voiceTask));
+  get('reuse-task').hidden = task === voiceTask || !task.history.length;
+  get('close-task').hidden = task === voiceTask || task.state === 'running';
+  get('composer').hidden = task === voiceTask;
+  get('send').disabled = task.state === 'running';
+  get('cancel').hidden = task.state !== 'running';
+  get('activity').textContent = task.detail;
+}
+
+get('new-task').onclick = () => { selectTask(makeTask()); get('prompt').focus(); };
+get('voice-task').onclick = () => selectTask(voiceTask);
+get('reuse-task').onclick = () => {
+  const prompt = selectedTask.history.find(turn => turn.role === 'user')?.content;
+  if (!prompt) return;
+  selectTask(makeTask());
+  get('prompt').value = prompt;
+  get('prompt').focus();
+};
+get('close-task').onclick = () => {
+  const task = selectedTask;
+  if (task === voiceTask || task.state === 'running') return;
+  api.closeTask(task.id);
+  tasks.delete(task.id);
+  saveHistory();
+  selectTask([...tasks.values()].find(item => item !== voiceTask) || makeTask());
+};
+
+function message(role, text, task = selectedTask) {
   const entry = document.createElement('div');
   entry.className = 'message ' + role;
   const title = document.createElement('strong');
@@ -32,8 +130,8 @@ function message(role, text) {
   const body = document.createElement('span');
   body.textContent = text;
   entry.append(title, body);
-  get('messages').append(entry);
-  scroll();
+  task.log.append(entry);
+  if (task === selectedTask) scroll();
   return body;
 }
 
@@ -57,37 +155,60 @@ get('provider').onchange = () => {
 get('composer').onsubmit = async event => {
   event.preventDefault();
   const content = get('prompt').value.trim();
-  if (!content || busy || voice) return;
+  if (content && await submitTask(selectedTask, content)) get('prompt').focus();
+};
+
+async function submitTask(task, content, background = false) {
+  if (!content || task === voiceTask || task.state === 'running') return;
   if (!get('text-key').value.trim() || !get('text-model').value.trim()) {
-    get('settings').showModal();
+    if (!background && !get('settings').open) get('settings').showModal();
+    if (background) { task.state = 'failed'; task.detail = 'Configure the text provider in Settings.'; renderTasks(); }
     return;
   }
-  busy = true;
-  get('send').disabled = get('voice').disabled = true;
-  get('cancel').hidden = false;
-  get('prompt').value = '';
-  message('user', content);
-  get('activity').textContent = 'Waiting for the model…';
+  if (!task.history.length) task.title = content.slice(0, 70);
+  task.state = 'running';
+  task.detail = 'Waiting for the model…';
+  task.stopping = false;
+  if (!background) get('prompt').value = '';
+  message('user', content, task);
+  renderTasks();
   try {
     const turn = { role: 'user', content };
     const reply = await api.chat({
       provider, model: get('text-model').value.trim(), key: get('text-key').value.trim(),
-      url: get('text-url').value.trim(), folder: selectedFolder(), automation: get('automation').checked,
-    }, [...history.slice(-28), turn]);
-    message('assistant', reply);
-    history.push(turn, { role: 'assistant', content: reply });
+      url: get('text-url').value.trim(), folder: background ? undefined : selectedFolder(),
+      automation: !background && get('automation').checked,
+    }, [...task.history.slice(-28), turn], task.id);
+    message('assistant', reply.text, task);
+    task.history.push(turn, { role: 'assistant', content: reply.text });
+    task.state = reply.paused ? 'paused' : 'done';
+    task.detail = reply.paused ? 'Complete verification in this task’s browser, then type “continue”.' : '';
   } catch (error) {
-    message('assistant', error.message.replace(/^Error invoking remote method '[^']+': Error: /, ''));
+    task.state = task.stopping ? 'stopped' : 'failed';
+    message('assistant', task.stopping ? 'Task stopped.' :
+      error.message.replace(/^Error invoking remote method '[^']+': Error: /, ''), task);
+    task.detail = '';
   } finally {
-    busy = false;
-    get('send').disabled = get('voice').disabled = false;
-    get('cancel').hidden = true;
-    get('activity').textContent = '';
-    get('prompt').focus();
+    saveHistory();
+    renderTasks();
   }
+  return task === selectedTask;
+}
+
+api.onDelegate(request => {
+  const task = makeTask();
+  submitTask(task, request, true);
+});
+get('cancel').onclick = () => {
+  selectedTask.stopping = true;
+  api.stopTask(selectedTask.id);
 };
-get('cancel').onclick = () => api.stop();
-api.onActivity(detail => { get('activity').textContent = detail; });
+api.onActivity(update => {
+  const task = typeof update === 'string' ? voiceTask : tasks.get(update.taskId);
+  if (!task) return;
+  task.detail = typeof update === 'string' ? update : update.detail;
+  if (task === selectedTask) get('activity').textContent = task.detail;
+});
 
 function clearPlayback(session) {
   for (const source of session.sources) source.stop();
@@ -99,15 +220,15 @@ function stopVoice() {
   const session = voice;
   if (!session) return;
   voice = undefined;
-  api.stop();
+  api.stopVoice();
   session.stream?.getTracks().forEach(track => track.stop());
   clearPlayback(session);
   session.context?.close();
   get('mouth').style.transform = 'scaleY(.13)';
   get('voice').textContent = 'Start voice';
   get('state').textContent = 'Ready';
-  get('send').disabled = false;
-  get('activity').textContent = '';
+  voiceTask.detail = '';
+  renderTasks();
 }
 
 function play(session, data, mimeType) {
@@ -147,7 +268,7 @@ get('voice').onclick = async () => {
   if (!key || !model) return get('settings').showModal();
   const session = { sources: new Set(), next: 0, level: 0 };
   voice = session;
-  get('send').disabled = true;
+  selectTask(voiceTask);
   get('state').textContent = 'Connecting';
   get('voice').textContent = 'Stop voice';
   try {
@@ -172,11 +293,14 @@ get('voice').onclick = async () => {
     session.waveform = new Float32Array(session.analyser.fftSize);
     session.analyser.connect(session.context.destination);
     animate(session);
-    await api.startVoice({ key, model, folder: selectedFolder(), automation: get('automation').checked });
+    await api.startVoice({
+      key, model, folder: selectedFolder(), automation: get('automation').checked,
+      background: Boolean(get('text-key').value.trim() && get('text-model').value.trim()),
+    });
   } catch (error) {
     if (voice !== session) return;
     stopVoice();
-    message('assistant', error.message);
+    message('assistant', error.message, voiceTask);
   }
 };
 
@@ -185,7 +309,12 @@ api.onVoice(({ state, notice, content }) => {
   if (!session) return;
   if (state === 'Offline') stopVoice();
   if (state === 'Listening') session.ready = true;
-  if (notice) get('activity').textContent = notice;
+  if (state === 'Reconnecting') {
+    session.ready = false;
+    clearPlayback(session);
+    get('state').textContent = state;
+  }
+  if (notice !== undefined) { voiceTask.detail = notice; renderTasks(); }
   if (!content) return;
   if (content.interrupted) clearPlayback(session);
   for (const part of content.modelTurn?.parts || []) {
@@ -196,17 +325,28 @@ api.onVoice(({ state, notice, content }) => {
   for (const [type, role] of [['inputTranscription', 'user'], ['outputTranscription', 'assistant']]) {
     const transcript = content[type];
     if (transcript?.text) {
-      session[type] ||= message(role, '');
+      session[type] ||= message(role, '', voiceTask);
       session[type].textContent += transcript.text;
-      scroll();
+      if (voiceTask === selectedTask) scroll();
     }
-    if (transcript?.finished) session[type] = undefined;
+    if (transcript?.finished) {
+      const phrase = session[type]?.textContent.trim().replace(/[.!?।]+$/, '').toLowerCase();
+      if (role === 'user' && ['mithra stop listening', 'stop listening', 'මිත්‍රා නවත්වන්න'].includes(phrase)) {
+        stopVoice();
+        return;
+      }
+      session[type] = undefined;
+    }
   }
   if (content.turnComplete || content.interrupted) {
     session.inputTranscription = undefined;
     session.outputTranscription = undefined;
-    get('activity').textContent = '';
+    if (selectedTask === voiceTask) get('activity').textContent = voiceTask.detail;
   }
 });
 
+api.onVoiceToggle(() => get('voice').click());
+get('voice-shortcut').textContent = navigator.platform.startsWith('Mac') ? '· ⌘ Shift Space' : '· Ctrl Shift Space';
+restoreHistory();
+selectTask(makeTask());
 message('assistant', 'ආයුබෝවන්! අද මම ඔබට කොහොමද උදව් කරන්නේ?');
