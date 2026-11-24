@@ -70,3 +70,7 @@ Add personal preferences, active projects or recurring instructions under **Sett
 Install version 0.2.2 or newer from GitHub Releases. Mithra checks the public GitHub Releases feed on startup. You can also open **Settings → App updates → Check for updates**. If an update is available, choose **Download update** and then **Restart and install** when ready. Finish running tasks and stop Gemini Live first.
 
 The Windows release workflow uploads the installer, update manifest and blockmap to the same draft. Publish the draft after all packages have uploaded. The updater verifies the downloaded installer's checksum against that release manifest. The installer is unsigned. Linux ZIP users install new versions from GitHub Releases.
+
+## Browser downloads
+
+Ask Mithra to save a file from a site that offers a Download or Export control. After approving that action, choose the destination in **Save As**. Browser tasks can save files offered directly by the site. In-service offline viewing and streaming-only playback follow the site's own options.
