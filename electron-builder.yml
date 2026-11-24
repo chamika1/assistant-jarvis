@@ -5,6 +5,7 @@ directories:
 files:
   - main.cjs
   - browser-controls.cjs
+  - attachments.cjs
   - settings-store.cjs
   - updater.cjs
   - hermes-client.cjs

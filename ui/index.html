@@ -48,7 +48,12 @@
       <label class="check"><input id="automation" type="checkbox"> Enable browser actions</label>
       <div class="workspace"><label class="check"><input id="cli" type="checkbox"> Enable project commands</label><button id="choose-folder" type="button" class="secondary">Choose folder</button></div>
       <div id="running-hint" hidden>This task is running. <button id="parallel-task" class="secondary" type="button">Start another task</button></div>
-      <div class="entry"><input id="prompt" type="text" placeholder="Ask Mithra anything…" aria-label="Message" maxlength="12000" required><button id="send" type="submit">Send</button><button id="cancel" type="button" class="secondary" hidden>Stop</button></div>
+      <div class="task-buttons attachments">
+        <button id="attach" type="button" class="secondary">Attach files or images</button>
+        <input id="file-picker" type="file" multiple hidden accept=".png,.jpg,.jpeg,.webp,.txt,.md,.csv,.tsv,.json,.xml,.yaml,.yml,.log,.html,.css,.js,.py">
+        <div id="attachment-list" aria-label="Attachments"></div>
+      </div>
+      <div class="entry"><input id="prompt" type="text" placeholder="Ask Mithra anything…" aria-label="Message" maxlength="12000"><button id="send" type="submit">Send</button><button id="cancel" type="button" class="secondary" hidden>Stop</button></div>
     </form>
   </section>
 </main>

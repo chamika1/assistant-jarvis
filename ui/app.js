@@ -31,7 +31,7 @@ function makeTask(id = crypto.randomUUID(), title = 'New task') {
   const log = document.createElement('div');
   log.setAttribute('role', 'log');
   log.setAttribute('aria-live', 'polite');
-  const task = { id, title, log, history: [], state: 'ready', detail: '', draft: '', events: [] };
+  const task = { id, title, log, history: [], state: 'ready', detail: '', draft: '', events: [], attachments: [] };
   tasks.set(id, task);
   return task;
 }
@@ -114,6 +114,7 @@ function renderTasks() {
   get('cancel').hidden = task.state !== 'running';
   get('activity').textContent = task.detail;
   renderHermesControl();
+  renderAttachments();
 }
 
 function newTask() {
@@ -372,10 +373,43 @@ get('settings').addEventListener('cancel', event => {
   if (get('settings-save').disabled) event.preventDefault();
 });
 
+function renderAttachments() {
+  get('attach').disabled = selectedTask.state === 'running';
+  get('attachment-list').replaceChildren(...selectedTask.attachments.map((file, index) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'secondary';
+    chip.disabled = selectedTask.state === 'running';
+    chip.textContent = file.name + ' ×';
+    chip.setAttribute('aria-label', 'Remove ' + file.name);
+    chip.onclick = () => {
+      selectedTask.attachments.splice(index, 1);
+      renderAttachments();
+    };
+    return chip;
+  }));
+}
+get('attach').onclick = () => get('file-picker').click();
+get('file-picker').onchange = event => {
+  const task = selectedTask;
+  if (task.state === 'running' || task === voiceTask) return;
+  const files = [...task.attachments, ...event.target.files];
+  event.target.value = '';
+  const imageSize = files.filter(file => /\.(png|jpe?g|webp)$/i.test(file.name)).reduce((n, file) => n + file.size, 0);
+  const total = files.reduce((n, file) => n + file.size, 0);
+  if (files.length > 4 || imageSize > 4 * 1024 * 1024 || total - imageSize > 128 * 1024) {
+    task.detail = 'Attach up to four files, totaling 4 MiB for images and 128 KiB for text files.';
+  } else {
+    task.attachments = files;
+    task.detail = 'Attachments are sent to the selected provider when you send the task.';
+  }
+  renderTasks();
+};
+
 get('composer').onsubmit = async event => {
   event.preventDefault();
   const content = get('prompt').value.trim();
-  if (content && await submitTask(selectedTask, content)) get('prompt').focus();
+  if ((content || selectedTask.attachments.length) && await submitTask(selectedTask, content || 'Analyze these attachments.')) get('prompt').focus();
 };
 
 function textSettings() {
@@ -403,16 +437,20 @@ async function submitTask(task, content, background = false, config) {
     task.draft = '';
     if (selectedTask === task) get('prompt').value = '';
   }
-  message('user', content, task);
+  const files = task.attachments.slice();
+  const display = files.length ? content + '\nAttachments: ' + files.map(file => file.name).join(', ') : content;
+  message('user', display, task);
   renderTasks();
   try {
+    const attachments = await Promise.all(files.map(async file => ({ name: file.name, data: new Uint8Array(await file.arrayBuffer()) })));
     const turn = { role: 'user', content };
     const reply = await api.chat({
       ...config, folder: background ? undefined : selectedFolder(),
       automation: !background && get('automation').checked,
-    }, [...task.history.slice(-28), turn], task.id);
+    }, [...task.history.slice(-28), turn], task.id, attachments);
     message('assistant', reply.text, task);
-    task.history.push(turn, { role: 'assistant', content: reply.text });
+    task.history.push({ role: 'user', content: display }, { role: 'assistant', content: reply.text });
+    task.attachments = [];
     task.state = reply.stopped ? 'stopped' : reply.paused ? 'paused' : 'done';
     task.detail = reply.paused ? 'Complete verification in this task’s browser, then type “continue”.' : '';
   } catch (error) {

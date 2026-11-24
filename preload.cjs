@@ -12,7 +12,7 @@ contextBridge.exposeInMainWorld('mithra', {
   loadSettings: () => ipcRenderer.invoke('settings-load'),
   saveSettings: settings => ipcRenderer.invoke('settings-save', settings),
   pickFolder: () => ipcRenderer.invoke('project-folder'),
-  chat: (settings, history, taskId) => ipcRenderer.invoke('chat', settings, history, taskId),
+  chat: (settings, history, taskId, attachments) => ipcRenderer.invoke('chat', settings, history, taskId, attachments),
   startVoice: settings => ipcRenderer.invoke('live-start', settings),
   stopVoice: () => ipcRenderer.send('stop-voice'),
   stopTask: id => ipcRenderer.send('stop-task', id),

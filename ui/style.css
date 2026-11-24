@@ -91,3 +91,6 @@ input:not([type=checkbox]),select{background:#0f1823;border-color:#34445a}
 #task-event-list{max-height:125px;overflow:auto;margin:5px 0 0;padding-left:18px;overflow-wrap:anywhere}
 #task-event-list li{margin:5px 0}
 #task-event-list span{display:block;color:#adb9ca;white-space:pre-wrap}
+.attachments{align-items:center;margin:6px 0;flex-wrap:wrap}
+#attachment-list{display:flex;gap:5px;flex-wrap:wrap}
+#attachment-list button{font-size:12px;max-width:200px;text-overflow:ellipsis;overflow:hidden}

@@ -86,3 +86,9 @@ For a public YouTube or Facebook video you have permission to download, install 
 Select **Hermes Agent · local gateway** under **Settings → Text provider** to run tasks with the upstream Hermes engine. Mithra uses its Runs API for persistent sessions, approval, clarification, and stopping runs. The connection test shows active toolsets and a skill count. Gemini Live voice can delegate background tasks to Hermes.
 
 See [Hermes feature analysis and setup](HERMES-ANALYSIS.md).
+
+## Files and image vision
+
+In a text task, choose **Attach files or images**, select files, add a question and send. The selected provider receives the attachments on send. Supported images are PNG, JPEG, and WebP. Supported documents are UTF-8 text, Markdown, CSV, JSON, and common plain-text source formats. A message can include four attachments with a 4 MiB total image limit and a 128 KiB total text limit.
+
+For image analysis, select Hermes with a vision-capable model, OpenAI, or a compatible vision provider. Hermes image turns use its Chat Completions image endpoint and show a status while waiting for the answer. Text-only Hermes turns retain Runs activity. Mithra's optional local task history records attachment names and replies. Direct provider requests need a fresh attachment if a later turn requires the original file contents.

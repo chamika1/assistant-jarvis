@@ -137,7 +137,18 @@ function createHermesClient({ url, key, request = fetch }) {
     } finally { stream.abort(); }
   }
 
-  return { inspect, run };
+  async function vision({ sessionId, content, signal }) {
+    const result = await call('/chat/completions', {
+      body: { messages: [{ role: 'user', content }] },
+      headers: { 'X-Hermes-Session-Id': sessionId },
+      timeout: 120000, signal,
+    });
+    const text = result?.choices?.[0]?.message?.content;
+    if (typeof text !== 'string' || !text) throw new Error('Hermes returned no image analysis. Check the configured vision model.');
+    return { text };
+  }
+
+  return { inspect, run, vision };
 }
 
 module.exports = { createHermesClient };
