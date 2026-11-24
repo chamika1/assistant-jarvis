@@ -20,16 +20,16 @@ Open **Settings**. For voice, enter your Gemini API key and the Gemini Live mode
 
 For text, select OpenAI, DeepSeek, or a custom OpenAI-compatible provider, then enter that provider's key and model ID. Custom providers need an HTTPS base URL that serves `/chat/completions`. For browser tasks, select a model that supports function calling with that provider.
 
-The voice model and text model are independent. API keys are kept in memory for the current session. The selected text service receives text chat history, while Gemini receives audio during live sessions. When browser actions are enabled, the active model also receives a limited view of page headings and controls.
+The voice model and text model are independent. Use **Save & close** to persist provider profiles and API keys in your operating system’s encrypted storage. On Linux, a compatible keyring must be available to retain the keys after exit. The selected text service receives text chat history, while Gemini receives audio during live sessions. When browser actions are enabled, the active model also receives a limited view of page headings and controls.
 
 ## Browser workflows
 
 1. Enable **Browser actions** before sending a message or starting voice.
 2. Ask Mithra to open the target website and explain the task. Example: “Open https://example.com and tell me what controls you find.”
 3. For a signup, provide the site and the ordinary field values you want used. Mithra can open a separate Chromium window, inspect visible labels, fill fields, and propose clicks across multiple steps.
-4. Review proposed clicks in Mithra. Enter passwords and verification codes directly in Chromium and complete any CAPTCHA yourself. After manual interaction, ask Mithra to continue. The browser session stays open while the app runs.
+4. Routine same-site navigation and playback proceed directly. Review consequential or ambiguous clicks in Mithra. Enter passwords and verification codes directly in Chromium and complete any CAPTCHA yourself. After manual interaction, ask Mithra to continue. The browser session stays open while the app runs.
 
-This starter covers visible HTTPS browser workflows. It currently supports exact accessible labels and names, so sites with unavailable or ambiguous labels can require manual interaction. Native desktop app control, background scheduling, and persistent browser profiles are outside this release.
+This starter covers visible HTTPS browser workflows. It currently supports accessible labels, placeholder text, tabs, visible media tiles and embedded video controls. The assistant checks whether video time advances before reporting playback. Sites with playback errors or unavailable controls can still require manual interaction. Native desktop app control, background scheduling, and persistent browser profiles are outside this release.
 
 ## Development
 
@@ -47,7 +47,7 @@ If Mithra detects a common CAPTCHA or human-verification page, complete the chal
 
 ## Desktop packages
 
-Download the Windows or Linux x64 zip from GitHub Releases and extract it before launching. On Windows, open **Mithra Desktop.exe**. On Linux, launch **mithra-desktop** from the extracted folder. These builds are unsigned. Browser actions use an installed Google Chrome or Microsoft Edge, or Playwright Chromium if installed. The project CLI tools still use Git and Node from your PATH.
+On Windows x64, download and run the setup EXE from GitHub Releases. Portable Windows and Linux x64 zip packages are also available. For portable Windows, extract the zip and open **Mithra Desktop.exe**. On Linux, launch **mithra-desktop** from the extracted folder. These builds are unsigned. Browser actions use an installed Google Chrome or Microsoft Edge, or Playwright Chromium if installed. The project CLI tools still use Git and Node from your PATH.
 
 Build the packages yourself with `npm run dist:win` or `npm run dist:linux`.
 
@@ -60,3 +60,7 @@ Build the packages yourself with `npm run dist:win` or `npm run dist:linux`.
 - Browser clicks and project commands still need approval in the app. CAPTCHA, password and verification-code steps are completed directly in the browser.
 
 [Hermes Agent](https://github.com/NousResearch/hermes-agent) and [Muse Agent](https://github.com/raghavkhandal72-coder/muse-agent) informed the parallel-task and local workspace design. Mithra uses its own Electron interface, Gemini Live connection, and tool implementation.
+
+## Long-term memory
+
+Add personal preferences, active projects or recurring instructions under **Settings → Long-term memory**. Saving keeps the notes on this device across restarts. If you enable **Include memory in new AI requests**, Mithra provides those notes to the selected text model and new Gemini Live sessions. This is editable context. Conversation history is a separate opt-in feature. API keys use the operating system’s encrypted storage and are kept outside memory and history.

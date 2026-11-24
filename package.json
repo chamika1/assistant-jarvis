@@ -1,21 +1,28 @@
 {
   "name": "mithra-desktop",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
-    "check": "node --check main.cjs && node --check preload.cjs && node --check ui/app.js && node --check ui/mic.js",
-    "dist": "electron-builder --linux zip --win zip",
+    "check": "node --check main.cjs && node --check browser-controls.cjs && node --check settings-store.cjs && node --check preload.cjs && node --check ui/app.js && node --check ui/mic.js && node --check ui/avatar.mjs",
+    "dist": "electron-builder --linux zip --win nsis zip",
     "dist:linux": "electron-builder --linux zip",
-    "dist:win": "electron-builder --win zip"
+    "dist:win": "electron-builder --win nsis zip",
+    "build:avatar": "esbuild ui/avatar.mjs --bundle --format=iife --minify --outfile=ui/avatar.bundle.js",
+    "prestart": "npm run build:avatar",
+    "predist": "npm run build:avatar",
+    "predist:linux": "npm run build:avatar",
+    "predist:win": "npm run build:avatar"
   },
   "devDependencies": {
     "electron": "^45.4.1",
-    "electron-builder": "^26.18.0"
+    "electron-builder": "^26.18.0",
+    "esbuild": "0.28.2"
   },
   "dependencies": {
-    "playwright": "^1.65.1"
+    "playwright": "^1.65.1",
+    "three": "0.187.0"
   },
   "engines": {
     "node": ">=22"

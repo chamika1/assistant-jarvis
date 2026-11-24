@@ -140,17 +140,94 @@ function scroll() {
   log.scrollTop = log.scrollHeight;
 }
 
-get('settings-open').onclick = () => get('settings').showModal();
-get('provider').onchange = () => {
-  profiles[provider] = { key: get('text-key').value, model: get('text-model').value, url: get('text-url').value };
-  provider = get('provider').value;
+const memoryKey = 'mithra.longTermMemory';
+let savedMemory = { text: '', enabled: false };
+try {
+  savedMemory = JSON.parse(localStorage.getItem(memoryKey) || 'null') || savedMemory;
+} catch {
+  // Keep the defaults if this preference cannot be read.
+}
+
+function memoryContext() {
+  return savedMemory.enabled ? savedMemory.text : undefined;
+}
+
+function rememberProfile() {
+  profiles[provider] = {
+    key: get('text-key').value.trim(), model: get('text-model').value.trim(), url: get('text-url').value.trim(),
+  };
+}
+
+function showProvider(value) {
+  provider = Object.hasOwn(profiles, value) ? value : 'openai';
+  get('provider').value = provider;
   const profile = profiles[provider];
   get('text-key').value = profile.key;
   get('text-model').value = profile.model;
   get('text-url').value = profile.url;
   get('url-row').hidden = provider !== 'custom';
   get('provider-pill').textContent = get('provider').selectedOptions[0].textContent;
+}
+
+const sessionSettingsMessage = 'Secure storage is unavailable. API keys will last for this session only.';
+const settingsReady = api.loadSettings().then(result => {
+  if (!result?.available) {
+    get('settings-status').textContent = sessionSettingsMessage;
+    return;
+  }
+  if (result.unreadable) {
+    get('settings-status').textContent = 'Saved keys could not be opened. Enter them again and save.';
+    return;
+  }
+  const settings = result.settings;
+  if (!settings) return;
+  for (const name of Object.keys(profiles)) {
+    if (settings.profiles?.[name]) profiles[name] = settings.profiles[name];
+  }
+  showProvider(settings.provider);
+  get('voice-key').value = settings.voice?.key || '';
+  if (settings.voice?.model) get('voice-model').value = settings.voice.model;
+}).catch(() => {
+  get('settings-status').textContent = 'Could not load saved API settings.';
+});
+
+get('settings-open').onclick = async () => {
+  await settingsReady;
+  if (get('settings').open) return;
+  get('memory').value = savedMemory.text;
+  get('use-memory').checked = savedMemory.enabled;
+  get('settings').showModal();
 };
+get('provider').onchange = () => {
+  rememberProfile();
+  showProvider(get('provider').value);
+};
+get('settings-close').onclick = () => {
+  if (!get('settings-save').disabled) get('settings').close();
+};
+get('settings-form').onsubmit = async event => {
+  event.preventDefault();
+  const button = get('settings-save');
+  button.disabled = true;
+  rememberProfile();
+  try {
+    const memory = { text: get('memory').value.trim(), enabled: get('use-memory').checked };
+    localStorage.setItem(memoryKey, JSON.stringify(memory));
+    savedMemory = memory;
+    const result = await api.saveSettings({
+      provider, profiles, voice: { key: get('voice-key').value.trim(), model: get('voice-model').value.trim() },
+    });
+    get('settings-status').textContent = result?.available ? 'API settings saved using secure storage.' : sessionSettingsMessage;
+    if (result?.available) get('settings').close();
+  } catch {
+    get('settings-status').textContent = 'Could not save settings. Your API keys remain available for this session.';
+  } finally {
+    button.disabled = false;
+  }
+};
+get('settings').addEventListener('cancel', event => {
+  if (get('settings-save').disabled) event.preventDefault();
+});
 
 get('composer').onsubmit = async event => {
   event.preventDefault();
@@ -159,9 +236,10 @@ get('composer').onsubmit = async event => {
 };
 
 async function submitTask(task, content, background = false) {
+  await settingsReady;
   if (!content || task === voiceTask || task.state === 'running') return;
   if (!get('text-key').value.trim() || !get('text-model').value.trim()) {
-    if (!background && !get('settings').open) get('settings').showModal();
+    if (!background && !get('settings').open) get('settings-open').click();
     if (background) { task.state = 'failed'; task.detail = 'Configure the text provider in Settings.'; renderTasks(); }
     return;
   }
@@ -177,7 +255,7 @@ async function submitTask(task, content, background = false) {
     const reply = await api.chat({
       provider, model: get('text-model').value.trim(), key: get('text-key').value.trim(),
       url: get('text-url').value.trim(), folder: background ? undefined : selectedFolder(),
-      automation: !background && get('automation').checked,
+      automation: !background && get('automation').checked, memory: memoryContext(),
     }, [...task.history.slice(-28), turn], task.id);
     message('assistant', reply.text, task);
     task.history.push(turn, { role: 'assistant', content: reply.text });
@@ -225,6 +303,7 @@ function stopVoice() {
   clearPlayback(session);
   session.context?.close();
   get('mouth').style.transform = 'scaleY(.13)';
+  window.mithraAvatar?.(0);
   get('voice').textContent = 'Start voice';
   get('state').textContent = 'Ready';
   voiceTask.detail = '';
@@ -257,15 +336,18 @@ function animate(session) {
   const rms = Math.sqrt(waveform.reduce((sum, sample) => sum + sample * sample, 0) / waveform.length);
   session.level = session.level * .55 + Math.min(1, rms * 6) * .45;
   get('mouth').style.transform = `scaleY(${.13 + session.level * .87})`;
+  window.mithraAvatar?.(session.level);
   if (session.ready) get('state').textContent = session.level > .07 ? 'Speaking' : 'Listening';
   requestAnimationFrame(() => animate(session));
 }
 
 get('voice').onclick = async () => {
   if (voice) return stopVoice();
+  await settingsReady;
+  if (voice) return;
   const key = get('voice-key').value.trim();
   const model = get('voice-model').value.trim();
-  if (!key || !model) return get('settings').showModal();
+  if (!key || !model) return get('settings-open').click();
   const session = { sources: new Set(), next: 0, level: 0 };
   voice = session;
   selectTask(voiceTask);
@@ -295,7 +377,7 @@ get('voice').onclick = async () => {
     animate(session);
     await api.startVoice({
       key, model, folder: selectedFolder(), automation: get('automation').checked,
-      background: Boolean(get('text-key').value.trim() && get('text-model').value.trim()),
+      memory: memoryContext(), background: Boolean(get('text-key').value.trim() && get('text-model').value.trim()),
     });
   } catch (error) {
     if (voice !== session) return;

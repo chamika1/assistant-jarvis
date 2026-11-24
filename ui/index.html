@@ -17,6 +17,7 @@
     <div class="state"><i></i><span id="state">Ready</span></div>
     <div class="stage" aria-hidden="true">
       <div class="orbit"></div>
+      <canvas id="robot-canvas"></canvas>
       <div class="robot"><div class="visor"><div class="eyes"><b></b><b></b></div><div id="mouth"></div></div></div>
     </div>
     <h1 lang="si">ආයුබෝවන්!</h1>
@@ -39,9 +40,9 @@
   </section>
 </main>
 <dialog id="settings">
-  <form method="dialog">
-    <div class="chat-top"><h2>Settings</h2><button class="secondary">Done</button></div>
-    <p>API keys stay in memory for this app session.</p>
+  <form id="settings-form" method="dialog">
+    <div class="chat-top"><h2>Settings</h2><div class="task-buttons"><button id="settings-close" class="secondary" type="button">Close</button><button id="settings-save" type="submit">Save &amp; close</button></div></div>
+    <p id="settings-status" role="status">API keys are stored using your system’s secure storage when available.</p>
     <label class="check"><input id="save-history" type="checkbox"> Keep text task history on this device</label>
     <fieldset><legend>Gemini Live voice</legend>
       <label>API key <input id="voice-key" type="password" autocomplete="off"></label>
@@ -53,8 +54,14 @@
       <label>API key <input id="text-key" type="password" autocomplete="off"></label>
       <label>Model <input id="text-model" value="gpt-4o-mini"></label>
     </fieldset>
+    <fieldset><legend>Long-term memory</legend>
+      <label class="check"><input id="use-memory" type="checkbox"> Include memory in new AI requests</label>
+      <label>Saved preferences and notes <textarea id="memory" rows="4" maxlength="12000" placeholder="Things you want Mithra to remember across sessions"></textarea></label>
+      <p>Memory stays on this device. Enabling it shares these notes with the active AI provider. Keep secrets out of these notes.</p>
+    </fieldset>
   </form>
 </dialog>
+<script src="avatar.bundle.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -25,8 +25,8 @@ jobs:
             command: dist:win
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '24'
           cache: npm
@@ -52,4 +52,8 @@ jobs:
             echo "The release must be a draft"
             exit 1
           fi
-          gh release upload "$RELEASE_TAG" "dist/mithra-desktop-${RELEASE_TAG#v}-${PLATFORM}-x64.zip"
+          packages=("dist/mithra-desktop-${RELEASE_TAG#v}-${PLATFORM}-x64.zip")
+          if [[ "$PLATFORM" == "windows" ]]; then
+            packages+=("dist/mithra-desktop-${RELEASE_TAG#v}-windows-x64-setup.exe")
+          fi
+          gh release upload "$RELEASE_TAG" "${packages[@]}"

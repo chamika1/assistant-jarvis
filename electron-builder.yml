@@ -4,6 +4,8 @@ directories:
   output: dist
 files:
   - main.cjs
+  - browser-controls.cjs
+  - settings-store.cjs
   - preload.cjs
   - ui/**
   - package.json
@@ -11,6 +13,11 @@ asar: true
 win:
   signAndEditExecutable: false
   artifactName: mithra-desktop-${version}-windows-${arch}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: mithra-desktop-${version}-windows-${arch}-setup.${ext}
 linux:
   category: Utility
   artifactName: mithra-desktop-${version}-linux-${arch}.${ext}
