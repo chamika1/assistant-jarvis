@@ -432,6 +432,8 @@ async function startLive(settings, resumeHandle, reconnects = 0) {
     },
   }] : [])];
   if (!settings.key || !settings.model) throw new Error('Enter a Gemini API key and a Live model in Settings.');
+  const voiceName = settings.voiceName?.trim() || '';
+  if (voiceName && !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(voiceName)) throw new Error('Enter a valid Gemini voice name.');
   if (!/^(models\/)?[a-zA-Z0-9._-]+$/.test(settings.model)) throw new Error('Invalid Live model ID.');
   const url = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent';
   const socket = new WebSocket(url + '?key=' + encodeURIComponent(settings.key));
@@ -440,7 +442,10 @@ async function startLive(settings, resumeHandle, reconnects = 0) {
   socket.addEventListener('open', () => {
     socket.send(JSON.stringify({ setup: {
       model: settings.model.startsWith('models/') ? settings.model : 'models/' + settings.model,
-      generationConfig: { responseModalities: ['AUDIO'] },
+      generationConfig: {
+        responseModalities: ['AUDIO'],
+        ...(voiceName ? { speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } } : {}),
+      },
       systemInstruction: { parts: [{ text: instructionsFor(settings) +
         '\nFor spoken input, expect Sri Lankan Sinhala, English, or both in one sentence. Preserve names and song titles. ' +
         'If a short phrase is unclear, use the previous turn as context. Ask one focused clarification if the intended action or title is still uncertain. ' +

@@ -286,6 +286,7 @@ const settingsReady = api.loadSettings().then(result => {
   showProvider(settings.provider);
   get('voice-key').value = settings.voice?.key || '';
   if (settings.voice?.model) get('voice-model').value = settings.voice.model;
+  get('voice-name').value = settings.voice?.name || '';
 }).catch(() => {
   get('settings-status').textContent = 'Could not load saved API settings.';
 });
@@ -355,7 +356,9 @@ get('settings-form').onsubmit = async event => {
     localStorage.setItem(memoryKey, JSON.stringify(memory));
     savedMemory = memory;
     const result = await api.saveSettings({
-      provider, profiles, voice: { key: get('voice-key').value.trim(), model: get('voice-model').value.trim() },
+      provider, profiles, voice: {
+        key: get('voice-key').value.trim(), model: get('voice-model').value.trim(), name: get('voice-name').value.trim(),
+      },
     });
     get('settings-status').textContent = result?.available ? 'API settings saved using secure storage.' : sessionSettingsMessage;
     if (result?.available) get('settings').close();
@@ -528,7 +531,7 @@ get('voice').onclick = async () => {
     session.analyser.connect(session.context.destination);
     animate(session);
     await api.startVoice({
-      key, model, folder: selectedFolder(), automation: get('automation').checked,
+      key, model, voiceName: get('voice-name').value.trim(), folder: selectedFolder(), automation: get('automation').checked,
       memory: memoryContext(),
       background: Boolean(session.textConfig.key && (session.textConfig.provider === 'hermes' || session.textConfig.model)),
       backgroundEngine: session.textConfig.provider,

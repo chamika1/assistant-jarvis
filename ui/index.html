@@ -64,6 +64,13 @@
     <fieldset><legend>Gemini Live voice</legend>
       <label>API key <input id="voice-key" type="password" autocomplete="off"></label>
       <label>Live model <input id="voice-model" value="gemini-3.1-flash-live-preview"></label>
+      <label>Voice <input id="voice-name" list="voice-presets" placeholder="Model default" maxlength="64" pattern="[A-Za-z][A-Za-z0-9_\-]{0,63}"></label>
+      <datalist id="voice-presets">
+        <option value="Aoede"></option><option value="Charon"></option><option value="Fenrir"></option>
+        <option value="Kore"></option><option value="Leda"></option><option value="Orus"></option>
+        <option value="Puck"></option><option value="Zephyr"></option>
+      </datalist>
+      <p>Choose a voice or enter a voice name supported by your Live model. Applies when you start voice again.</p>
     </fieldset>
     <fieldset><legend>Text provider</legend>
       <label>Provider <select id="provider"><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="hermes">Hermes Agent · local gateway</option><option value="custom">Custom · OpenAI-compatible</option></select></label>
