@@ -1,6 +1,11 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('mithra', {
+  updateState: () => ipcRenderer.invoke('update-state'),
+  checkUpdate: () => ipcRenderer.invoke('update-check'),
+  downloadUpdate: () => ipcRenderer.invoke('update-download'),
+  installUpdate: () => ipcRenderer.invoke('update-install'),
+  onUpdate: fn => ipcRenderer.on('update-status', (_event, status) => fn(status)),
   loadSettings: () => ipcRenderer.invoke('settings-load'),
   saveSettings: settings => ipcRenderer.invoke('settings-save', settings),
   pickFolder: () => ipcRenderer.invoke('project-folder'),

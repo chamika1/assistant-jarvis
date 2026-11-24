@@ -54,6 +54,7 @@ jobs:
           fi
           packages=("dist/mithra-desktop-${RELEASE_TAG#v}-${PLATFORM}-x64.zip")
           if [[ "$PLATFORM" == "windows" ]]; then
-            packages+=("dist/mithra-desktop-${RELEASE_TAG#v}-windows-x64-setup.exe")
+            setup="dist/mithra-desktop-${RELEASE_TAG#v}-windows-x64-setup.exe"
+            packages+=("$setup" "$setup.blockmap" "dist/latest.yml")
           fi
           gh release upload "$RELEASE_TAG" "${packages[@]}"

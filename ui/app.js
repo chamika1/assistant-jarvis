@@ -198,6 +198,47 @@ get('settings-open').onclick = async () => {
   get('use-memory').checked = savedMemory.enabled;
   get('settings').showModal();
 };
+const updateLabel = {
+  idle: 'Check for updates', current: 'Check again', error: 'Check again',
+  available: 'Download update', ready: 'Restart and install',
+};
+const updateAction = {
+  idle: api.checkUpdate, current: api.checkUpdate, error: api.checkUpdate,
+  available: api.downloadUpdate, ready: api.installUpdate,
+};
+let updateState;
+function showUpdate(update) {
+  if (!update) return;
+  updateState = update;
+  const text = {
+    idle: 'Ready to check for updates.',
+    unsupported: 'In-app updates are available in the Windows build.',
+    checking: 'Checking for updates…',
+    current: 'You have the latest version.',
+    available: `Version ${update.next} is available.`,
+    downloading: `Downloading version ${update.next}… ${update.progress}%`,
+    ready: `Version ${update.next} is ready to install.`,
+    installing: 'Restarting to install the update…',
+  };
+  get('update-status').textContent = `Version ${update.version}. ${update.message || text[update.phase] || ''}`;
+  const button = get('update-action');
+  button.hidden = !updateLabel[update.phase];
+  button.textContent = updateLabel[update.phase] || '';
+  const notice = get('update-notice');
+  notice.hidden = !['available', 'downloading', 'ready'].includes(update.phase);
+  notice.textContent = update.phase === 'ready' ? 'Update ready' : update.phase === 'downloading' ? 'Downloading update…' : 'Update available';
+}
+api.onUpdate(showUpdate);
+api.updateState().then(status => { if (!updateState) showUpdate(status); });
+get('update-notice').onclick = () => {
+  get('settings-open').click();
+  settingsReady.then(() => get('updates').scrollIntoView({ block: 'nearest' }));
+};
+get('update-action').onclick = async () => {
+  const action = updateAction[updateState?.phase];
+  if (action) showUpdate(await action());
+};
+
 get('provider').onchange = () => {
   rememberProfile();
   showProvider(get('provider').value);

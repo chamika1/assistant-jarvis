@@ -3,6 +3,7 @@ const path = require('node:path');
 const { readFile } = require('node:fs/promises');
 const { execFile } = require('node:child_process');
 const { chromium } = require('playwright');
+const { createUpdater } = require('./updater.cjs');
 const { createSettingsStore } = require('./settings-store.cjs');
 const { setTimeout: delay } = require('node:timers/promises');
 const { allowsRoutineClick, describeControl, playbackSnapshot, visibleControls } = require('./browser-controls.cjs');
@@ -461,6 +462,17 @@ app.whenReady().then(() => {
   contents.session.setPermissionRequestHandler((sender, permission, callback, details) => callback(Boolean(media(sender, permission, details.mediaTypes))));
   contents.session.setPermissionCheckHandler((sender, permission, origin, details) => Boolean(media(sender, permission, [details.mediaType])));
   const trusted = (sender) => sender.sender === contents && sender.senderFrame === contents.mainFrame;
+  const updates = createUpdater({
+    engine: app.isPackaged && process.platform === 'win32' ? require('electron-updater').autoUpdater : null,
+    version: app.getVersion(),
+    notify: status => event('update-status', status),
+    canInstall: () => !live && chats.size === 0,
+  });
+  ipcMain.handle('update-state', sender => trusted(sender) ? updates.state() : undefined);
+  ipcMain.handle('update-check', sender => trusted(sender) ? updates.check() : undefined);
+  ipcMain.handle('update-download', sender => trusted(sender) ? updates.download() : undefined);
+  ipcMain.handle('update-install', sender => trusted(sender) ? updates.install() : undefined);
+  contents.once('did-finish-load', () => { updates.check(); });
   const store = createSettingsStore({ directory: app.getPath('userData'), encryption: safeStorage, platform: process.platform });
   ipcMain.handle('settings-load', sender => trusted(sender) ? store.load() : undefined);
   ipcMain.handle('settings-save', (sender, settings) => {

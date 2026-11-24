@@ -1,11 +1,11 @@
 {
   "name": "mithra-desktop",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
-    "check": "node --check main.cjs && node --check browser-controls.cjs && node --check settings-store.cjs && node --check preload.cjs && node --check ui/app.js && node --check ui/mic.js && node --check ui/avatar.mjs",
+    "check": "node --check main.cjs && node --check browser-controls.cjs && node --check settings-store.cjs && node --check updater.cjs && node --check preload.cjs && node --check ui/app.js && node --check ui/mic.js && node --check ui/avatar.mjs",
     "dist": "electron-builder --linux zip --win nsis zip",
     "dist:linux": "electron-builder --linux zip",
     "dist:win": "electron-builder --win nsis zip",
@@ -21,6 +21,7 @@
     "esbuild": "0.28.2"
   },
   "dependencies": {
+    "electron-updater": "6.8.11",
     "playwright": "^1.65.1",
     "three": "0.187.0"
   },

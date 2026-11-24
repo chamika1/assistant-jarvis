@@ -64,3 +64,9 @@ Build the packages yourself with `npm run dist:win` or `npm run dist:linux`.
 ## Long-term memory
 
 Add personal preferences, active projects or recurring instructions under **Settings → Long-term memory**. Saving keeps the notes on this device across restarts. If you enable **Include memory in new AI requests**, Mithra provides those notes to the selected text model and new Gemini Live sessions. This is editable context. Conversation history is a separate opt-in feature. API keys use the operating system’s encrypted storage and are kept outside memory and history.
+
+## In-app updates on Windows
+
+Install version 0.2.2 or newer from GitHub Releases. Mithra checks the public GitHub Releases feed on startup. You can also open **Settings → App updates → Check for updates**. If an update is available, choose **Download update** and then **Restart and install** when ready. Finish running tasks and stop Gemini Live first.
+
+The Windows release workflow uploads the installer, update manifest and blockmap to the same draft. Publish the draft after all packages have uploaded. The updater verifies the downloaded installer's checksum against that release manifest. The installer is unsigned. Linux ZIP users install new versions from GitHub Releases.

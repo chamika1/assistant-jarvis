@@ -10,7 +10,7 @@
 <body>
 <header>
   <div class="brand"><div class="mark">m</div><div>Mithra <small>DESKTOP ASSISTANT</small></div></div>
-  <button id="settings-open" class="secondary">Settings</button>
+  <div class="task-buttons"><button id="update-notice" type="button" hidden>Update available</button><button id="settings-open" class="secondary">Settings</button></div>
 </header>
 <main>
   <section class="avatar" aria-label="Mithra voice controls">
@@ -44,6 +44,10 @@
     <div class="chat-top"><h2>Settings</h2><div class="task-buttons"><button id="settings-close" class="secondary" type="button">Close</button><button id="settings-save" type="submit">Save &amp; close</button></div></div>
     <p id="settings-status" role="status">API keys are stored using your system’s secure storage when available.</p>
     <label class="check"><input id="save-history" type="checkbox"> Keep text task history on this device</label>
+    <fieldset id="updates"><legend>App updates</legend>
+      <p id="update-status" role="status"></p>
+      <button id="update-action" class="secondary" type="button" hidden></button>
+    </fieldset>
     <fieldset><legend>Gemini Live voice</legend>
       <label>API key <input id="voice-key" type="password" autocomplete="off"></label>
       <label>Live model <input id="voice-model" value="gemini-3.1-flash-live-preview"></label>

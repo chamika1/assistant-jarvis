@@ -6,11 +6,16 @@ files:
   - main.cjs
   - browser-controls.cjs
   - settings-store.cjs
+  - updater.cjs
   - preload.cjs
   - ui/**
   - package.json
 asar: true
 win:
+  publish:
+    provider: github
+    owner: chamika1
+    repo: assistant-jarvis
   signAndEditExecutable: false
   artifactName: mithra-desktop-${version}-windows-${arch}.${ext}
 nsis:
