@@ -1,6 +1,7 @@
 const { app, BrowserWindow, dialog, globalShortcut, ipcMain, safeStorage } = require('electron');
 const path = require('node:path');
 const { readFile } = require('node:fs/promises');
+const { randomUUID } = require('node:crypto');
 const { execFile } = require('node:child_process');
 const { chromium } = require('playwright');
 const { createHermesClient } = require('./hermes-client.cjs');
@@ -17,6 +18,7 @@ function instructionsFor(settings) {
 
 const presets = { openai: 'https://api.openai.com/v1', deepseek: 'https://api.deepseek.com/v1' };
 const definitions = [
+  ['youtube_search', 'Open YouTube search results directly for a song, artist, genre or video. Use this instead of filling a YouTube search box. Then locate and activate a video result and verify playback.', { query: { type: 'string' } }],
   ['browser_open', 'Open an HTTPS page in the dedicated browser', { url: { type: 'string' } }],
   ['browser_read', 'Read visible controls and page structure from the active browser tab', {}],
   ['browser_fill', 'Fill a visible form field by its exact accessible label. For secrets, let the user type directly.', { label: { type: 'string' }, value: { type: 'string' } }],
@@ -225,6 +227,12 @@ async function browserAction(name, args, signal, taskId) {
   if (name === 'media_download') return mediaDownload(args.url, signal, taskId);
   if (name === 'browser_close' && args.scope === 'browser') return { closed: await closeBrowser() };
   let page = browserSessions.get(taskId)?.page;
+  if (name === 'youtube_search') {
+    if (typeof args.query !== 'string' || !args.query.trim() || args.query.length > 500) throw new Error('Provide a short YouTube search query.');
+    const url = new URL('https://www.youtube.com/results');
+    url.searchParams.set('search_query', args.query.trim());
+    return browserAction('browser_open', { url: url.href }, signal, taskId);
+  }
   if (name === 'browser_open') {
     if (page && !page.isClosed() && await checkVerification(page)) return verificationRequired(taskId);
     const url = httpsUrl(args.url);
@@ -416,7 +424,9 @@ async function startLive(settings, resumeHandle, reconnects = 0) {
     parameters: { type: 'object', properties: {} },
   }, ...(settings.background ? [{
     name: 'delegate_text_task',
-    description: 'When the user requests background work, delegate an independent task to their selected text engine. Hermes can use its configured tools when selected.',
+    description: settings.backgroundEngine === 'hermes'
+      ? 'Send a clearly requested agent task to Hermes. Use for multi-step tasks that need Hermes tools. Include all relevant user-provided task context. Returns a task ID for the workspace.'
+      : 'Send an explicitly requested background task to the selected text engine.',
     parameters: {
       type: 'object', properties: { request: { type: 'string' } }, required: ['request'],
     },
@@ -431,7 +441,13 @@ async function startLive(settings, resumeHandle, reconnects = 0) {
     socket.send(JSON.stringify({ setup: {
       model: settings.model.startsWith('models/') ? settings.model : 'models/' + settings.model,
       generationConfig: { responseModalities: ['AUDIO'] },
-      systemInstruction: { parts: [{ text: instructionsFor(settings) }] },
+      systemInstruction: { parts: [{ text: instructionsFor(settings) +
+        '\nFor spoken input, expect Sri Lankan Sinhala, English, or both in one sentence. Preserve names and song titles. ' +
+        'If a short phrase is unclear, use the previous turn as context. Ask one focused clarification if the intended action or title is still uncertain. ' +
+        'For YouTube search, call youtube_search with the spoken title, artist, or genre. Use the visible results and verify playback before saying it started. ' +
+        (settings.backgroundEngine === 'hermes'
+          ? 'Use delegate_text_task for a clear multi-step request needing Hermes, or whenever the user explicitly asks to use Hermes. Announce that a task was handed off and distinguish it from a completed task.'
+          : '') }] },
       inputAudioTranscription: {}, outputAudioTranscription: {},
       contextWindowCompression: { slidingWindow: {} },
       sessionResumption: resumeHandle ? { handle: resumeHandle } : {},
@@ -470,8 +486,9 @@ async function startLive(settings, resumeHandle, reconnects = 0) {
             } else if (chats.size >= 4) {
               response = { error: 'Four tasks are already running.' };
             } else {
-              event('delegate-task', request);
-              response = { requested: true, message: 'The task was sent to the workspace. Check active tasks for progress.' };
+              const taskId = randomUUID();
+              event('delegate-task', { taskId, request });
+              response = { requested: true, taskId, message: 'The task was sent to the workspace. Check active tasks for progress.' };
             }
           } else {
             response = await runTool(call.name, call.args || {}, session.abort.signal, settings, 'voice');

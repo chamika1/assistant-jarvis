@@ -375,18 +375,26 @@ get('composer').onsubmit = async event => {
   if (content && await submitTask(selectedTask, content)) get('prompt').focus();
 };
 
-async function submitTask(task, content, background = false) {
+function textSettings() {
+  return {
+    provider, model: get('text-model').value.trim(), key: get('text-key').value.trim(),
+    url: get('text-url').value.trim(), memory: memoryContext(),
+  };
+}
+
+async function submitTask(task, content, background = false, config) {
   await settingsReady;
+  config ??= textSettings();
   if (!content || task === voiceTask || task.state === 'running') return;
-  if (!get('text-key').value.trim() || (provider !== 'hermes' && !get('text-model').value.trim())) {
+  if (!config.key || (config.provider !== 'hermes' && !config.model)) {
     if (!background && !get('settings').open) get('settings-open').click();
     if (background) { task.state = 'failed'; task.detail = 'Configure the text provider in Settings.'; renderTasks(); }
     return;
   }
-  const engine = provider;
+  const engine = config.provider;
   if (!task.history.length) task.title = content.slice(0, 70);
   task.state = 'running';
-  task.detail = provider === 'hermes' ? 'Waiting for the Hermes gateway…' : 'Waiting for the model…';
+  task.detail = engine === 'hermes' ? 'Waiting for the Hermes gateway…' : 'Waiting for the model…';
   task.stopping = false;
   if (!background) {
     task.draft = '';
@@ -397,9 +405,8 @@ async function submitTask(task, content, background = false) {
   try {
     const turn = { role: 'user', content };
     const reply = await api.chat({
-      provider, model: get('text-model').value.trim(), key: get('text-key').value.trim(),
-      url: get('text-url').value.trim(), folder: background ? undefined : selectedFolder(),
-      automation: !background && get('automation').checked, memory: memoryContext(),
+      ...config, folder: background ? undefined : selectedFolder(),
+      automation: !background && get('automation').checked,
     }, [...task.history.slice(-28), turn], task.id);
     message('assistant', reply.text, task);
     task.history.push(turn, { role: 'assistant', content: reply.text });
@@ -417,9 +424,10 @@ async function submitTask(task, content, background = false) {
   return task === selectedTask;
 }
 
-api.onDelegate(request => {
-  const task = makeTask();
-  submitTask(task, request, true);
+api.onDelegate(({ taskId, request }) => {
+  if (!voice) return;
+  const task = makeTask(taskId);
+  submitTask(task, request, true, voice.textConfig);
 });
 get('cancel').onclick = () => {
   selectedTask.stopping = true;
@@ -492,7 +500,7 @@ get('voice').onclick = async () => {
   const key = get('voice-key').value.trim();
   const model = get('voice-model').value.trim();
   if (!key || !model) return get('settings-open').click();
-  const session = { sources: new Set(), next: 0, level: 0 };
+  const session = { sources: new Set(), next: 0, level: 0, textConfig: textSettings() };
   voice = session;
   selectTask(voiceTask);
   get('state').textContent = 'Connecting';
@@ -521,7 +529,9 @@ get('voice').onclick = async () => {
     animate(session);
     await api.startVoice({
       key, model, folder: selectedFolder(), automation: get('automation').checked,
-      memory: memoryContext(), background: Boolean(get('text-key').value.trim() && (provider === 'hermes' || get('text-model').value.trim())),
+      memory: memoryContext(),
+      background: Boolean(session.textConfig.key && (session.textConfig.provider === 'hermes' || session.textConfig.model)),
+      backgroundEngine: session.textConfig.provider,
     });
   } catch (error) {
     if (voice !== session) return;
