@@ -27,9 +27,9 @@ The voice model and text model are independent. Use **Save & close** to persist 
 1. Enable **Browser actions** before sending a message or starting voice.
 2. Ask Mithra to open the target website and explain the task. Example: “Open https://example.com and tell me what controls you find.”
 3. For a signup, provide the site and the ordinary field values you want used. Mithra can open a separate Chromium window, inspect visible labels, fill fields, and propose clicks across multiple steps.
-4. Routine same-site navigation and playback proceed directly. Review consequential or ambiguous clicks in Mithra. Enter passwords and verification codes directly in Chromium and complete any CAPTCHA yourself. After manual interaction, ask Mithra to continue. The browser session stays open while the app runs.
+4. Routine same-site navigation and playback proceed directly. Review consequential or ambiguous clicks in Mithra. Enter passwords and verification codes directly in Chromium and complete any CAPTCHA yourself. After manual interaction, ask Mithra to continue. Mithra reuses its browser window across tasks.
 
-This starter covers visible HTTPS browser workflows. It currently supports accessible labels, placeholder text, tabs, visible media tiles and embedded video controls. The assistant checks whether video time advances before reporting playback. Sites with playback errors or unavailable controls can still require manual interaction. Native desktop app control, background scheduling, and persistent browser profiles are outside this release.
+This starter covers visible HTTPS browser workflows. It currently supports accessible labels, placeholder text, tabs, visible media tiles and embedded video controls. The assistant checks whether video time advances before reporting playback. Sites with playback errors or unavailable controls can still require manual interaction. Native desktop app control and background scheduling are outside this release.
 
 ## Development
 
@@ -54,9 +54,9 @@ Build the packages yourself with `npm run dist:win` or `npm run dist:linux`.
 ## Voice and concurrent tasks
 
 - Start Gemini Live with the **Start voice** button or **Ctrl+Shift+Space** (**⌘+Shift+Space** on macOS), then speak naturally. Gemini Live reconnects on eligible disconnects when a resumption token is available. Keep the app open while listening. Say “Mithra stop listening” or “මිත්‍රා නවත්වන්න” to end the session.
-- Use **New task** to work on up to four independent text tasks at a time. Their tabs show progress. Each browser-enabled task has its own temporary browsing context. Closing the task clears its browser context.
+- Use **New task** to work on up to four independent text tasks at a time. Their tabs show progress. Browser-enabled tasks use their own tabs in one Mithra browser profile. Closing a task closes its tabs.
 - With a text provider configured, tell Gemini Live to delegate something in the background, for example “මිත්‍රා, මේ මාතෘකාව ගැන කෙටි වාර්තාවක් background task එකක් විදිහට ලියන්න.” The text model handles that request while Gemini keeps listening. Ask “What tasks are running?” to check progress. Delegated text tasks use no browser or project tools.
-- Enable **Keep text task history on this device** in Settings to reopen text conversations later. **Reuse prompt** lets you start a fresh task with a previous request. History is local and unencrypted, and browser sessions are temporary.
+- Enable **Keep text task history on this device** in Settings to reopen text conversations later. **Reuse prompt** lets you start a fresh task with a previous request. History is local and unencrypted, and Mithra keeps its browser profile on this device.
 - Browser clicks and project commands still need approval in the app. CAPTCHA, password and verification-code steps are completed directly in the browser.
 
 [Hermes Agent](https://github.com/NousResearch/hermes-agent) and [Muse Agent](https://github.com/raghavkhandal72-coder/muse-agent) informed the parallel-task and local workspace design. Mithra uses its own Electron interface, Gemini Live connection, and tool implementation.
@@ -74,3 +74,9 @@ The Windows release workflow uploads the installer, update manifest and blockmap
 ## Browser downloads
 
 Ask Mithra to save a file from a site that offers a Download or Export control. After approving that action, choose the destination in **Save As**. Browser tasks can save files offered directly by the site. In-service offline viewing and streaming-only playback follow the site's own options.
+
+## Reusable browser profile and media downloads
+
+Browser tasks reopen the same Mithra-managed profile and share its sign-ins. Log in manually in that window once. Your existing everyday Chrome profile stays separate. Ask Mithra to close the current tab or the whole Mithra browser.
+
+For a public YouTube or Facebook video you have permission to download, install a current [yt-dlp](https://github.com/yt-dlp/yt-dlp#installation) on PATH and restart Mithra. Give it the single video URL, ask to download it, and choose a folder. Mithra uses a combined video/audio format and leaves browser cookies separate. Some videos require additional upstream tooling or are unavailable to yt-dlp. Site-provided Download controls remain available.

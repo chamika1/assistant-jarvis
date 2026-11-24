@@ -87,6 +87,7 @@ async function playbackSnapshot(tab) {
     const statuses = await frame.locator('video').filter({ visible: true }).evaluateAll(videos => videos.map(video => ({
       state: video.error ? 'error' : video.ended ? 'ended' : video.paused ? 'paused' : video.readyState >= 2 ? 'playing' : 'buffering',
       currentTime: video.currentTime,
+      adShowing: Boolean(video.closest('.ad-showing, .ad-interrupting')),
       errorCode: video.error?.code || undefined,
     }))).catch(() => []);
     media.push(...statuses);
