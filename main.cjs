@@ -426,7 +426,7 @@ async function startLive(settings, resumeHandle, reconnects = 0) {
   }, ...(settings.background ? [{
     name: 'delegate_text_task',
     description: settings.backgroundEngine === 'hermes'
-      ? 'Send a clearly requested agent task to Hermes. Use for multi-step tasks that need Hermes tools. Include all relevant user-provided task context. Returns a task ID for the workspace.'
+      ? 'Hand off a clear action to Hermes when the action needs tools you do not have, even for a single step. Examples include restarting the PC, opening a desktop app, or working with local files. Preserve the requested target and timing. Returns a workspace task ID.'
       : 'Send an explicitly requested background task to the selected text engine.',
     parameters: {
       type: 'object', properties: { request: { type: 'string' } }, required: ['request'],
@@ -451,8 +451,8 @@ async function startLive(settings, resumeHandle, reconnects = 0) {
         '\nFor spoken input, expect Sri Lankan Sinhala, English, or both in one sentence. Preserve names and song titles. ' +
         'If a short phrase is unclear, use the previous turn as context. Ask one focused clarification if the intended action or title is still uncertain. ' +
         'For YouTube search, call youtube_search with the spoken title, artist, or genre. Use the visible results and verify playback before saying it started. ' +
-        (settings.backgroundEngine === 'hermes'
-          ? 'Use delegate_text_task for a clear multi-step request needing Hermes, or whenever the user explicitly asks to use Hermes. Announce that a task was handed off and distinguish it from a completed task.'
+        (settings.background && settings.backgroundEngine === 'hermes'
+          ? 'Hermes is connected as your task engine. For any clear action requiring tools you do not have, call delegate_text_task in the same turn before replying, even if the request is a single step. This includes local device actions like restarting the PC, local apps and file operations. For example, if the user says to restart their PC in 10 seconds, send that exact action and delay to Hermes. The user does not have to say Hermes or ask for background work. If the action or its target is unclear, clarify first. Do not delegate an action you already started. Say the task was handed off only after the tool accepts it, and never claim the action completed based on handoff alone.'
           : '') }] },
       inputAudioTranscription: {}, outputAudioTranscription: {},
       contextWindowCompression: { slidingWindow: {} },
