@@ -4,6 +4,7 @@ const { readFile } = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
 const { execFile } = require('node:child_process');
 const { chromium } = require('playwright');
+const { deviceStatus } = require('./device-status.cjs');
 const { buildUserContent } = require('./attachments.cjs');
 const { createHermesClient } = require('./hermes-client.cjs');
 const { createUpdater } = require('./updater.cjs');
@@ -423,7 +424,15 @@ async function startLive(settings, resumeHandle, reconnects = 0) {
     name: 'active_tasks',
     description: 'List text tasks currently running in the Mithra task dashboard.',
     parameters: { type: 'object', properties: {} },
-  }, ...(settings.background ? [{
+  }, ...(process.platform === 'win32' ? [{
+    name: 'device_status',
+    description: 'Read Windows programs with visible windows, or sample processes for actual CPU and RAM usage. Use for running programs, heavy processes, Task Manager questions, or Windows performance. This reads data only.',
+    parameters: { type: 'object', properties: { view: { type: 'string', enum: ['apps', 'usage'] } }, required: ['view'] },
+  }] : []), ...(settings.automation ? [{
+    name: 'mithra_browser_tabs',
+    description: 'List open tabs in Mithra’s own browser window. Does not read personal Chrome or Edge tabs outside Mithra.',
+    parameters: { type: 'object', properties: {} },
+  }] : []), ...(settings.background ? [{
     name: 'delegate_text_task',
     description: settings.backgroundEngine === 'hermes'
       ? 'Hand off a clear action to Hermes when the action needs tools you do not have, even for a single step. Examples include restarting the PC, opening a desktop app, or working with local files. Preserve the requested target and timing. Returns a workspace task ID.'
@@ -449,7 +458,8 @@ async function startLive(settings, resumeHandle, reconnects = 0) {
       },
       systemInstruction: { parts: [{ text: instructionsFor(settings) +
         '\nFor spoken input, expect Sri Lankan Sinhala, English, or both in one sentence. Preserve names and song titles. ' +
-        'If a short phrase is unclear, use the previous turn as context. Ask one focused clarification if the intended action or title is still uncertain. ' +
+        'If speech is unclear or appears in an unexpected language, ask one short clarification in Sinhala. Treat stop phrases such as නවත්තන්න and band karo as stop requests. Do not start another action on a stop request. ' +
+        'For heavy tasks or running Windows programs, use device_status and report its actual measurements. Use active_tasks only for Mithra workspace jobs and mithra_browser_tabs only for tabs in Mithra’s browser. Never invent results or say you opened anything without a successful tool result. ' +
         'For YouTube search, call youtube_search with the spoken title, artist, or genre. Use the visible results and verify playback before saying it started. ' +
         (settings.background && settings.backgroundEngine === 'hermes'
           ? 'Hermes is connected as your task engine. For any clear action requiring tools you do not have, call delegate_text_task in the same turn before replying, even if the request is a single step. This includes local device actions like restarting the PC, local apps and file operations. For example, if the user says to restart their PC in 10 seconds, send that exact action and delay to Hermes. The user does not have to say Hermes or ask for background work. If the action or its target is unclear, clarify first. Do not delegate an action you already started. Say the task was handed off only after the tool accepts it, and never claim the action completed based on handoff alone.'
@@ -485,6 +495,17 @@ async function startLive(settings, resumeHandle, reconnects = 0) {
           let response;
           if (call.name === 'active_tasks') {
             response = { tasks: [...chats.values()].map(task => task.title) };
+          } else if (call.name === 'device_status') {
+            response = await deviceStatus(call.args?.view, session.abort.signal);
+          } else if (settings.automation && call.name === 'mithra_browser_tabs') {
+            const context = browserContextPromise ? await browserContextPromise : null;
+            const tabs = (context?.pages() || []).filter(tab => !tab.isClosed()).slice(0, 30);
+            response = { scope: 'Mithra browser only', tabs: tabs.map(tab => {
+              const address = tab.url();
+              if (!URL.canParse(address)) return '(unknown)';
+              const url = new URL(address);
+              return url.protocol === 'https:' || url.protocol === 'http:' ? url.origin : url.protocol;
+            }) };
           } else if (settings.background && call.name === 'delegate_text_task') {
             const request = call.args?.request;
             if (typeof request !== 'string' || !request.trim() || request.length > 12000) {

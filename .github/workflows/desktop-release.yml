@@ -32,6 +32,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - name: Smoke test Windows device status
+        if: matrix.platform == 'windows'
+        shell: bash
+        run: |
+          node -e 'const a=require("node:assert/strict"); const {deviceStatus}=require("./device-status.cjs"); Promise.all([deviceStatus("apps"),deviceStatus("usage")]).then(([apps,usage])=>{a.ok(Array.isArray(apps.apps),JSON.stringify(apps)); a.ok(Array.isArray(usage.topCpu)&&Array.isArray(usage.topRam),JSON.stringify(usage));}).catch(e=>{console.error(e);process.exitCode=1;});'
       - run: npm run ${{ matrix.command }} -- --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'

@@ -608,7 +608,7 @@ api.onVoice(({ state, notice, content }) => {
     }
     if (transcript?.finished) {
       const phrase = session[type]?.textContent.trim().replace(/[.!?।]+$/, '').toLowerCase();
-      if (role === 'user' && ['mithra stop listening', 'stop listening', 'මිත්‍රා නවත්වන්න'].includes(phrase)) {
+      if (role === 'user' && ['mithra stop listening', 'stop listening', 'මිත්‍රා නවත්වන්න', 'voice band karo', 'वॉइस बंद करो'].includes(phrase)) {
         stopVoice();
         return;
       }
